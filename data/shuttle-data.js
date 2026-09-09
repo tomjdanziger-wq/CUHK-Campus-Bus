@@ -1,38 +1,64 @@
 /* ===========================================================================
+ * shuttle-data.js — all CUHK campus data for the Shuttle Helper.
  *
- *   ⚠  PLACEHOLDER TIMETABLE  ⚠
+ * This is the ONLY file you need to edit each term.
  *
- *   The STOPS geometry below is real (coordinates and elevations came out of
- *   OpenStreetMap + SRTM). The ROUTES — their stop sequences, departure times,
- *   segment durations and service days — are INVENTED PLACEHOLDERS. They are
- *   plausible-looking so the app can be demonstrated, which makes them
- *   dangerous if shipped as-is.
+ * WHAT IS REAL HERE
+ *   Stops        Real. Positions and bilingual names come from OpenStreetMap's
+ *                mapped CUHK shuttle stops; elevations from SRTM 30 m.
+ *   Routes       Real. Stop sequences, service hours, departure minutes and
+ *                service days are extracted from the Transport Office's own
+ *                published route pages by scripts/extract-timetable.py.
  *
- *   Before deploying for real:
- *     1. Replace `routes` with the published CUHK shuttle timetable.
- *     2. Check every stop in `stops` actually exists and is where we say.
- *     3. Set  meta.isPlaceholder = false   and update  meta.validFrom / validUntil.
+ * WHAT IS ESTIMATED
+ *   Ride times   The Transport Office publishes departure minutes from the
+ *                first stop, but NOT running times between stops. So no route
+ *                carries `segmentMinutes`, and the app estimates each ride
+ *                from distance and gradient, labelling it "estimated" on the
+ *                card. `meta.rideTimesEstimated` drives a standing notice.
  *
- *   While `meta.isPlaceholder` is true the app shows a permanent red warning
- *   banner. That is intentional. Do not remove the banner instead of the flag.
+ *                This is the single biggest source of error in the app. If you
+ *                can time the routes with a stopwatch, adding `segmentMinutes`
+ *                to a route (one entry per hop) replaces the estimate and the
+ *                notice disappears for that route.
  *
- *   This is the ONLY file you need to edit each term.
+ *   Peak periods Guesses about when buses fill up, not measured data.
  *
+ * UPDATING EACH TERM
+ *   1. Save each route page from https://www.cuhk.edu.hk/campus-shuttle/
+ *      as a PDF into the project root.
+ *   2. python3 scripts/extract-timetable.py *.pdf > data/routes.generated.js
+ *   3. node scripts/validate-data.js          ← checks the result is sane
+ *   4. Update meta.lastUpdated / meta.validUntil below.
+ *
+ *   If a new stop appears, add it to `stops` here and map its printed label in
+ *   STOP_IDS inside scripts/extract-timetable.py. The validator will tell you
+ *   if you miss one.
  * =========================================================================== */
 
 (function (root) {
   'use strict';
 
   // -------------------------------------------------------------------------
-  // META — shown in the UI so users can tell whether the data is stale.
+  // META — surfaced in the UI so users can judge whether the data is stale.
   // -------------------------------------------------------------------------
   var meta = {
-    isPlaceholder: true,                 // ← set to false once real data is in
-    timetableLabel: 'Placeholder timetable (not the real CUHK schedule)',
-    validFrom: '2026-09-01',
-    validUntil: '2026-12-31',
-    sourceUrl: 'https://www.cuhk.edu.hk/campus-shuttle/',
-    lastUpdated: '2026-09-09'
+    // The timetable is now the real published one, not invented.
+    isPlaceholder: false,
+
+    // Ride times between stops are still estimated — see the note above.
+    rideTimesEstimated: true,
+
+    timetableLabel: 'CUHK Transport Office published timetable',
+    source: 'https://www.cuhk.edu.hk/campus-shuttle/',
+    extractedOn: '2026-09-09',
+    lastUpdated: '2026-09-09',
+
+    // The Transport Office does not print a validity window on the route
+    // pages, so we show the extraction date instead of inventing one. Set
+    // validUntil when you know the term's end date.
+    validFrom: null,
+    validUntil: null
   };
 
   // -------------------------------------------------------------------------
@@ -141,119 +167,81 @@
   };
 
   // -------------------------------------------------------------------------
-  // STOPS
+  // STOPS — real. Positions and bilingual names from OpenStreetMap's mapped
+  // CUHK shuttle stops; elevations from SRTM 30 m via OpenTopoData.
   //
-  // Coordinates and elevations are real (OSM + SRTM 30m). Elevation is in
-  // metres above sea level and is REQUIRED — it drives the walking estimate.
-  // Whether the shuttle genuinely stops at each of these is placeholder.
+  // `elevation` is metres above sea level and is REQUIRED: it drives the
+  // walking estimate, and a wrong value produces confidently wrong advice.
+  //
+  // Several stops exist as an (Upward)/(Downward) pair on opposite sides of
+  // the road. Where OpenStreetMap maps only one of the pair, both share that
+  // position — they are metres apart, well inside the walking model's error.
   // -------------------------------------------------------------------------
   var stops = [
-    { id: 'univ-station',    name: 'University MTR Station',        nameZh: '大學站',       lat: 22.414143, lng: 114.210574, elevation: 6 },
-    { id: 'chung-chi',       name: 'Chung Chi College',             nameZh: '崇基學院',     lat: 22.415153, lng: 114.208991, elevation: 6 },
-    { id: 'pommerenke',      name: 'Pommerenke Student Centre',     nameZh: '龐萬倫學生中心', lat: 22.417074, lng: 114.208995, elevation: 20 },
-    { id: 'sh-ho',           name: 'S.H. Ho / Morningside College', nameZh: '善衡 / 晨興書院', lat: 22.418297, lng: 114.210103, elevation: 53 },
-    { id: 'science-centre',  name: 'University Science Centre',     nameZh: '科學館',       lat: 22.419516, lng: 114.207990, elevation: 107 },
-    { id: 'run-run-shaw',    name: 'Sir Run Run Shaw Hall',         nameZh: '邵逸夫堂',     lat: 22.420148, lng: 114.207159, elevation: 103 },
-    { id: 'univ-admin',      name: 'University Administration Bldg', nameZh: '大學行政樓',   lat: 22.418964, lng: 114.205291, elevation: 101 },
-    { id: 'univ-library',    name: 'University Library',            nameZh: '大學圖書館',   lat: 22.419570, lng: 114.204778, elevation: 109 },
-    { id: 'united-college',  name: 'United College',                nameZh: '聯合書院',     lat: 22.421972, lng: 114.205157, elevation: 128 },
-    { id: 'new-asia',        name: 'New Asia College',              nameZh: '新亞書院',     lat: 22.421227, lng: 114.209053, elevation: 146 },
-    { id: 'chan-chun-ha',    name: 'Chan Chun Ha Hostel',           nameZh: '陳震夏宿舍',   lat: 22.422032, lng: 114.204955, elevation: 120 },
-    { id: 'lee-woo-sing',    name: 'Lee Woo Sing College',          nameZh: '和聲書院',     lat: 22.422427, lng: 114.204285, elevation: 79 },
-    { id: 'wu-yee-sun',      name: 'Wu Yee Sun College',            nameZh: '伍宜孫書院',   lat: 22.422231, lng: 114.202623, elevation: 94 },
-    { id: 'shaw-college',    name: 'Shaw College',                  nameZh: '逸夫書院',     lat: 22.423044, lng: 114.201430, elevation: 68 },
-    { id: 'cw-chu',          name: 'C. W. Chu College',             nameZh: '敬文書院',     lat: 22.425248, lng: 114.206510, elevation: 24 },
-    { id: 'postgrad-halls',  name: 'Postgraduate Halls (Area 39)',  nameZh: '研究生宿舍(三十九區)', lat: 22.426018, lng: 114.206271, elevation: 12 }
+    { id: 'univ-station'              , name: "University Station"                   , nameZh: "大學站", lat: 22.414537, lng: 114.210221, elevation:   7 },
+    { id: 'station-piazza'            , name: "University Station Piazza"            , nameZh: "港鐵大學站廣場", lat: 22.413808, lng: 114.209437, elevation:  10 },
+    { id: 'chung-chi-teaching'        , name: "Chung Chi Teaching Blocks"            , nameZh: "崇基教學樓", lat: 22.416036, lng: 114.208359, elevation:  12 },
+    { id: 'yiap'                      , name: "Yasumoto International Academic Park" , nameZh: "康本國際學術園", lat: 22.415973, lng: 114.210832, elevation:  19 },
+    { id: 'univ-sports-centre'        , name: "University Sports Centre"             , nameZh: "大學體育中心", lat: 22.417812, lng: 114.210482, elevation:  45 },
+    { id: 'sh-ho-college'             , name: "S.H. Ho College"                      , nameZh: "善衡書院", lat: 22.418042, lng: 114.209850, elevation:  49 },
+    { id: 'postgrad-hall-1'           , name: "Postgraduate Hall 1"                  , nameZh: "賽馬會研究生宿舍一座", lat: 22.420248, lng: 114.212171, elevation:  32 },
+    { id: 'campus-circuit-east-up'    , name: "Campus Circuit East (Upward)"         , nameZh: "環迴東路（上行）", lat: 22.421533, lng: 114.211835, elevation:  55 },  // APPROXIMATE — road-side stop, position not in OSM
+    { id: 'campus-circuit-east-down'  , name: "Campus Circuit East (Downward)"       , nameZh: "環迴東路（下行）", lat: 22.421533, lng: 114.211835, elevation:  55 },  // APPROXIMATE — road-side stop, position not in OSM
+    { id: 'campus-circuit-north-down' , name: "Campus Circuit North (Downward)"      , nameZh: "環迴北路（下行）", lat: 22.424445, lng: 114.209261, elevation:  11 },  // APPROXIMATE — road-side stop, position not in OSM
+    { id: 'sir-run-run-shaw-hall'     , name: "Sir Run Run Shaw Hall"                , nameZh: "邵逸夫堂", lat: 22.419841, lng: 114.206942, elevation: 102 },
+    { id: 'science-centre'            , name: "Science Centre"                       , nameZh: "科學館", lat: 22.419830, lng: 114.207342, elevation: 102 },
+    { id: 'fung-king-hey'             , name: "Fung King Hey Building"               , nameZh: "馮景禧樓", lat: 22.419864, lng: 114.203032, elevation: 113 },
+    { id: 'univ-admin'                , name: "University Administration Building"   , nameZh: "大學行政樓", lat: 22.418806, lng: 114.205358, elevation: 100 },
+    { id: 'united-college-up'         , name: "United College (Upward)"              , nameZh: "聯合書院（上行）", lat: 22.420390, lng: 114.205394, elevation: 136 },
+    { id: 'united-college-down'       , name: "United College (Downward)"            , nameZh: "聯合書院（下行）", lat: 22.420302, lng: 114.205340, elevation: 133 },
+    { id: 'new-asia-college'          , name: "New Asia College"                     , nameZh: "新亞書院", lat: 22.421271, lng: 114.207559, elevation: 142 },
+    { id: 'new-asia-circle'           , name: "New Asia Circle"                      , nameZh: "新亞坊", lat: 22.421072, lng: 114.207647, elevation: 141 },
+    { id: 'wu-yee-sun-up'             , name: "Wu Yee Sun College (Upward)"          , nameZh: "伍宜孫書院（上行）", lat: 22.421331, lng: 114.203471, elevation: 114 },
+    { id: 'wu-yee-sun-down'           , name: "Wu Yee Sun College (Downward)"        , nameZh: "伍宜孫書院（下行）", lat: 22.421199, lng: 114.203521, elevation: 116 },
+    { id: 'chan-chun-ha'              , name: "Chan Chun Ha Hostel"                  , nameZh: "陳震夏宿舍", lat: 22.421812, lng: 114.204612, elevation: 119 },
+    { id: 'shaw-college-up'           , name: "Shaw College (Upward)"                , nameZh: "逸夫書院（上行）", lat: 22.422486, lng: 114.201315, elevation:  82 },  // up/down stops share one mapped position
+    { id: 'shaw-college-down'         , name: "Shaw College (Downward)"              , nameZh: "逸夫書院（下行）", lat: 22.422486, lng: 114.201315, elevation:  82 },  // up/down stops share one mapped position
+    { id: 'uc-staff-residence'        , name: "United College Staff Residence"       , nameZh: "聯合苑", lat: 22.423259, lng: 114.205130, elevation:  83 },
+    { id: 'residence-15'              , name: "Residence No. 15"                     , nameZh: "十五苑", lat: 22.423716, lng: 114.206598, elevation:  62 },
+    { id: 'cw-chu-up'                 , name: "C.W. Chu College (Upward)"            , nameZh: "敬文書院（上行）", lat: 22.425557, lng: 114.206218, elevation:  23 },  // up/down stops share one mapped position
+    { id: 'cw-chu-down'               , name: "C.W. Chu College (Downward)"          , nameZh: "敬文書院（下行）", lat: 22.425557, lng: 114.206218, elevation:  23 },  // up/down stops share one mapped position
+    { id: 'area-39-up'                , name: "Area 39 (Upward)"                     , nameZh: "三十九區（上行）", lat: 22.427631, lng: 114.204351, elevation:   9 },  // up/down stops share one mapped position
+    { id: 'area-39-down'              , name: "Area 39 (Downward)"                   , nameZh: "三十九區（下行）", lat: 22.427631, lng: 114.204351, elevation:   9 },  // up/down stops share one mapped position
   ];
 
   // -------------------------------------------------------------------------
-  // ROUTES  —  ⚠ ENTIRELY PLACEHOLDER ⚠
+  // ROUTES — real, generated from the Transport Office PDFs.
   //
-  //   stops             ordered stop ids; the bus travels first → last
-  //   departureMinutes  minutes past the hour, departing the FIRST stop
-  //   firstDeparture    earliest departure from the first stop  (HH:MM)
-  //   lastDeparture     latest departure from the first stop    (HH:MM)
-  //   runsOn            'mon-fri' | 'mon-sat' | 'sat' | 'sun-ph' | 'daily'
-  //   segmentMinutes    OPTIONAL. Ride time for each hop; length must be
-  //                     stops.length - 1. Omit it and the app falls back to a
-  //                     distance-and-gradient estimate, which is worse. Fill
-  //                     this in if you have real running times.
-  //   notes             free text, shown on the option card
+  // Regenerate with:
+  //   python3 scripts/extract-timetable.py *.pdf > data/routes.generated.js
+  //
+  // To add measured running times to a route, give it a `segmentMinutes`
+  // array here (one entry per hop, length = stops.length - 1) and it will
+  // override the distance-based estimate:
+  //
+  //   var rideTimes = { '1': [2, 4, 2, 3, 2] };
+  //
   // -------------------------------------------------------------------------
-  var routes = [
-    {
-      id: '1A',
-      name: 'Route 1A',
-      nameZh: '一號線甲',
-      stops: ['univ-station', 'chung-chi', 'pommerenke', 'run-run-shaw', 'univ-admin', 'univ-library', 'united-college', 'chan-chun-ha'],
-      segmentMinutes: [2, 2, 4, 2, 1, 3, 2],
-      departureMinutes: [0, 20, 40],
-      firstDeparture: '07:40',
-      lastDeparture: '18:40',
-      runsOn: 'mon-sat',
-      notes: 'The main uphill spine. Placeholder times.'
-    },
-    {
-      id: '2',
-      name: 'Route 2',
-      nameZh: '二號線',
-      stops: ['univ-station', 'chung-chi', 'sh-ho', 'science-centre', 'new-asia'],
-      segmentMinutes: [2, 3, 5, 3],
-      departureMinutes: [10, 25, 40, 55],
-      firstDeparture: '07:45',
-      lastDeparture: '19:10',
-      runsOn: 'mon-sat',
-      notes: 'Most frequent route to New Asia. Placeholder times.'
-    },
-    {
-      id: '3',
-      name: 'Route 3',
-      nameZh: '三號線',
-      stops: ['univ-station', 'postgrad-halls', 'cw-chu', 'shaw-college', 'wu-yee-sun', 'lee-woo-sing'],
-      segmentMinutes: [5, 2, 4, 2, 2],
-      departureMinutes: [5, 35],
-      firstDeparture: '08:05',
-      lastDeparture: '18:35',
-      runsOn: 'mon-fri',
-      notes: 'North campus. Half-hourly — check the gap before walking down. Placeholder times.'
-    },
-    {
-      id: '4',
-      name: 'Route 4',
-      nameZh: '四號線',
-      stops: ['new-asia', 'science-centre', 'run-run-shaw', 'chung-chi', 'univ-station'],
-      segmentMinutes: [3, 2, 4, 2],
-      departureMinutes: [15, 45],
-      firstDeparture: '08:15',
-      lastDeparture: '19:45',
-      runsOn: 'mon-sat',
-      notes: 'Downhill return to the MTR. Placeholder times.'
-    },
-    {
-      id: '5',
-      name: 'Route 5',
-      nameZh: '五號線',
-      stops: ['shaw-college', 'wu-yee-sun', 'lee-woo-sing', 'chan-chun-ha', 'united-college', 'univ-library', 'science-centre', 'chung-chi', 'univ-station'],
-      segmentMinutes: [2, 2, 3, 2, 3, 2, 5, 2],
-      departureMinutes: [0, 30],
-      firstDeparture: '08:00',
-      lastDeparture: '18:30',
-      runsOn: 'mon-fri',
-      notes: 'Cross-campus, west to the station. Long ride — often faster to change. Placeholder times.'
-    },
-    {
-      id: '8',
-      name: 'Route 8',
-      nameZh: '八號線',
-      stops: ['univ-station', 'science-centre', 'univ-library', 'lee-woo-sing', 'shaw-college'],
-      segmentMinutes: [7, 2, 4, 2],
-      departureMinutes: [50],
-      firstDeparture: '08:50',
-      lastDeparture: '17:50',
-      runsOn: 'mon-fri',
-      notes: 'Express to the west campus, hourly only. Placeholder times.'
-    }
-  ];
+  var rideTimes = {
+    // '1': [2, 4, 2, 3, 2],
+  };
+
+  var routes = (root.CUHK_ROUTES_GENERATED || []).map(function (r) {
+    var seg = rideTimes[r.id];
+    return {
+      id: r.id,
+      name: r.name,
+      nameZh: r.nameZh,
+      label: r.label,
+      stops: r.stops,
+      segmentMinutes: (seg && seg.length === r.stops.length - 1) ? seg : null,
+      departureMinutes: r.departureMinutes,
+      firstDeparture: r.firstDeparture,
+      lastDeparture: r.lastDeparture,
+      runsOn: r.runsOn,
+      notes: r.notes
+    };
+  });
 
   // -------------------------------------------------------------------------
   // PLACE ALIASES — hand-maintained, merged over the auto-extracted list.
@@ -351,7 +339,7 @@
     stops: stops,
     routes: routes,
     places: generated.concat(extraStopPlaces),
-    attribution: 'Place data © OpenStreetMap contributors (ODbL). Elevations from SRTM via OpenTopoData.'
+    attribution: 'Stop and place data © OpenStreetMap contributors (ODbL). Elevations from SRTM via OpenTopoData. Timetable © The Chinese University of Hong Kong, Transport Office.'
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : this);

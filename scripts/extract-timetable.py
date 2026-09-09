@@ -36,9 +36,12 @@ HOW THE DIAGRAM IS READ
          monotonically down the right one, on every route. A campus loop that
          goes up one side and down the other cannot read any other way.
 
-    Check 3 is re-run automatically by --validate, using the elevations in
-    data/shuttle-data.js, so a future timetable change that breaks the
-    assumption will be noticed rather than silently mis-parsed.
+    Check 3 is re-run by scripts/validate-data.js, which prints each route's
+    elevation profile and fails on implausible hops — so a future layout change
+    that breaks the assumption shows up rather than being silently mis-parsed.
+    Always run it after regenerating:
+
+        node scripts/validate-data.js
 
 WHAT IT CANNOT GET
     Running times between stops. The published pages only give departure
@@ -273,8 +276,11 @@ def route(path):
     if len(bottom) > 1: seq.append(bottom[-1])       # last stop (right end)
     elif bottom: seq.append(bottom[0])               # a loop: terminus at both ends
 
+    # The label comes from the filename, where "/" is illegal and was saved as
+    # ":" — so "2 NA : UC.pdf" is really route 2, "NA / UC".
     name = re.sub(r'\s*\|.*$', '', os.path.splitext(base)[0]).strip()
     name = re.sub(r'^[0-9A-Z]+\s*', '', name)
+    name = re.sub(r'\s*:\s*', ' / ', name).strip()
 
     return {
         'id': rid,

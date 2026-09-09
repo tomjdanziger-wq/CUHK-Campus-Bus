@@ -6,13 +6,30 @@ It shows both options side by side with approximate times, and lets you decide. 
 
 ---
 
-## ⚠ Before you deploy this
+## Data status
 
-**The timetable in `data/shuttle-data.js` is invented.** The stop coordinates and elevations are real (extracted from OpenStreetMap), but the routes, departure times, running times and service days are plausible-looking placeholders.
+**The timetable is real.** Stop sequences, service hours, departure minutes and
+service days are extracted from the CUHK Transport Office's own published route
+pages (`scripts/extract-timetable.py`). Stop positions and bilingual names come
+from OpenStreetMap's mapped CUHK shuttle stops; elevations from SRTM 30 m.
 
-While `meta.isPlaceholder` is `true` the app shows a permanent red warning banner. Replace the routes with the published CUHK timetable, then set the flag to `false`.
+**Two things are still estimated, and the app says so on screen:**
 
-Do not remove the banner instead of the flag.
+| | Status |
+|---|---|
+| Departure times, stop order, service days | Published. Real. |
+| Stop positions, elevations | Real (OSM + SRTM). |
+| **Time spent on the bus between stops** | **Estimated from distance and gradient.** CUHK does not publish running times. An amber banner says this, and every ride leg is labelled "ride time estimated from distance". |
+| **Peak-period capacity warnings** | **Guesses**, not measured. Configured in `config.peakPeriods`. |
+
+Ride-time estimates are the largest error source in the app. If you time the
+routes with a stopwatch, add a `segmentMinutes` array to `rideTimes` in
+`data/shuttle-data.js` (one entry per hop) and the estimate is replaced by your
+measurement. Set `meta.rideTimesEstimated` to `false` once every route has one.
+
+Two stops — Campus Circuit East and Campus Circuit North — are roadside stops
+that OpenStreetMap does not map. Their positions are approximate to within
+about 100 m and are commented as such in the data file.
 
 ---
 
@@ -36,44 +53,114 @@ The only external request the app ever makes is loading Leaflet and OSM tiles fo
 
 ## Updating the timetable each term
 
-Everything you need to change lives in **one file**: `data/shuttle-data.js`. No route, stop or timetable data is hard-coded anywhere in the app logic.
+The timetable is extracted from the Transport Office's own pages, so updating is
+a re-run, not a retype.
 
-1. Edit the `routes` array.
-2. Edit `stops` if stops were added, moved or renamed.
-3. Update `meta.validFrom`, `meta.validUntil` and `meta.lastUpdated` — these are displayed in the footer so students can see whether the data is stale.
-4. Set `meta.isPlaceholder` to `false`.
+1. Save each route page from <https://www.cuhk.edu.hk/campus-shuttle/> as a PDF
+   into the project root. One file per route; the leading characters of the
+   filename become the route id, e.g. `2S NA:UC (S).pdf` → Route 2S. (Filenames
+   cannot contain `/`, so `NA : UC` is read back as `NA / UC`.)
+
+2. Regenerate and check:
+
+   ```bash
+   python3 scripts/extract-timetable.py *.pdf > data/routes.generated.js
+   node scripts/validate-data.js
+   ```
+
+3. Update `meta.lastUpdated` and `meta.extractedOn` in `data/shuttle-data.js`.
+
+If a new stop appears, the extractor prints `!! unmapped stop label` and skips
+it. Add the stop to `stops` in `data/shuttle-data.js` and map its printed label
+in `STOP_IDS` in `scripts/extract-timetable.py`.
+
+`scripts/validate-data.js` exits non-zero on failure, so it can gate a deploy.
+It checks that every referenced stop exists, that no stop repeats back-to-back,
+that consecutive stops are geographically plausible, that `segmentMinutes`
+lengths match, and that the timetable fields parse. It also prints each route's
+elevation profile.
+
+### How the PDFs are read
+
+The route pages are diagrams, not tables, and the PDFs use subsetted fonts, so
+raw string bytes are glyph indices rather than characters — digits come out as
+`!"#$%`. `scripts/extract-timetable.py` decodes each font through its ToUnicode
+CMap and tracks the full graphics state (CTM stack and text matrix) to recover
+where every text run sits on the page.
+
+Each route is drawn as a tall loop: the bus leaves the bottom row, climbs the
+**left** column bottom-to-top, crosses the top, and descends the **right**
+column top-to-bottom.
+
+Three independent checks confirm that reading:
+
+1. The "First Stop" badge is drawn at the left end of the bottom row and the
+   "Last Stop" badge at the right end — the ends adjacent to the upward and
+   downward columns.
+2. Route 1 decodes to the known Main Campus circuit.
+3. Elevations rise up the left column and fall down the right one. Route 2
+   reads 10 → 45 → 102 → 113 → 136 → 142 → 133 → 100 → 49 → 7 m. A campus loop
+   that climbs one side and descends the other cannot read any other way.
+
+Check 3 is why `validate-data.js` prints elevation profiles: a future layout
+change that breaks the assumption shows up as a saw-tooth rather than passing
+silently.
 
 ### Route schema
+
+`data/routes.generated.js` is auto-generated — do not hand-edit it. The shape:
 
 ```js
 {
   id: '2',
   name: 'Route 2',
-  nameZh: '二號線',
-  stops: ['univ-station', 'chung-chi', 'new-asia'],  // ordered, first → last
-  segmentMinutes: [2, 3],        // ride time per hop; length = stops.length - 1
-  departureMinutes: [10, 25, 40, 55],   // minutes past the hour, at the FIRST stop
-  firstDeparture: '07:45',       // earliest departure from the first stop
-  lastDeparture: '19:10',        // latest departure from the first stop
-  runsOn: 'mon-sat',             // mon-fri | mon-sat | sat | sun-ph | daily | 'mon,wed,fri'
-  notes: 'Shown on the option card'
+  nameZh: '新亞聯合線',
+  label: 'NA / UC',
+  stops: ['station-piazza', 'univ-sports-centre', ...],  // ordered, first → last
+  departureMinutes: [15, 45],    // minutes past the hour, at the FIRST stop
+  firstDeparture: '07:45',
+  lastDeparture: '18:45',
+  runsOn: 'mon-sat',             // mon-fri | mon-sat | sat | sun-ph | daily
+  notes: 'Buses departing from 31 to 00 minutes will stop at Sir Run Run Shaw Hall'
 }
 ```
 
-> **`segmentMinutes` is an addition to the schema in the original spec.** The spec's route shape had stop sequences and departure times but no running times, so there was no way to compute the ride leg or to work out when a bus reaches a stop that isn't the first one. It is optional: omit it and the app falls back to estimating from distance at `config.bus.fallbackSpeedKmh`, and labels that leg "ride time estimated from distance" on the card. Fill it in if you have real running times — the fallback is noticeably worse.
+> **`segmentMinutes` is an addition to the schema in the original spec.** The
+> spec's route shape had stop sequences and departure times but no running
+> times, so there was no way to compute the ride leg or work out when a bus
+> reaches a stop that isn't the first one. It is optional: without it the app
+> estimates from distance at `config.bus.fallbackSpeedKmh` and labels the leg
+> "ride time estimated from distance". Add real times via `rideTimes` in
+> `data/shuttle-data.js`.
 
-Departure times for stops after the first are derived by adding the cumulative ride time to the departure from the first stop.
+Departure times for stops after the first are derived by adding the cumulative
+ride time to the departure from the first stop.
 
 ### Stop schema
 
 ```js
-{ id: 'univ-station', name: 'University MTR Station', nameZh: '大學站',
-  lat: 22.414143, lng: 114.210574, elevation: 6 }
+{ id: 'univ-station', name: 'University Station', nameZh: '大學站',
+  lat: 22.414537, lng: 114.210221, elevation: 7 }
 ```
 
-`elevation` is metres above sea level and is **required** — it drives the whole walking estimate. A stop with a wrong elevation produces confidently wrong advice.
+`elevation` is metres above sea level and is **required** — it drives the whole
+walking estimate. A stop with a wrong elevation produces confidently wrong
+advice.
 
----
+Several stops exist as an (Upward)/(Downward) pair on opposite sides of the
+road, and are kept as separate stops: telling a new student to wait on the wrong
+side is exactly the failure this app exists to prevent. Where OSM maps only one
+of a pair, both share that position — they are metres apart, well inside the
+walking model's error.
+
+### Conditional stops
+
+Some stops are served only by certain departures ("Buses departing from 31 to 00
+minutes will stop at Sir Run Run Shaw Hall") or only on teaching days. The data
+model has no way to express per-departure variation, so these stops are included
+and the published caveat is carried in the route's `notes`, which the option
+card displays. Erring toward showing the option with its caveat attached beats
+silently hiding it.
 
 ## Regenerating the place list
 
@@ -160,6 +247,7 @@ These mattered more than features, so each one is enforced in a named place rath
 | "Scheduled" language throughout; no real-time claims | copy in `index.html` and the leg rows |
 | GPS guess always stated and correctable in one tap | `renderOriginConfirmation`, `app.js` |
 | Tight connections flagged rather than hidden inside the range | `isTight`, `lib/planner.js` |
+| Estimated ride times labelled as estimated, on every leg and in a banner | `meta.rideTimesEstimated`, `renderShuttleCard` |
 
 The last one is not in the original spec and was added because the numbers demanded it: the total assumes you catch the bus, so when the slow end of the walking estimate lands after the departure, the range is quietly optimistic in a way the user cannot see. The card now says so and names the fallback departure.
 
@@ -175,24 +263,43 @@ The last one is not in the original spec and was added because the numbers deman
 
 ### On transfers
 
-The spec asked for this to be flagged if the campus layout genuinely requires it. Against the placeholder route set it does not: the routes radiate from University Station and the Chung Chi area, so almost every pair of points is connected by a single route, and where one isn't, the walk is competitive anyway — the app offers it and says so.
+The spec asked for this to be flagged if the campus layout genuinely requires
+it. With the real timetable loaded, it mostly does not: Routes 1, 2, 2S, 3, 4
+and 8 all touch the University Station / Station Piazza area, so almost every
+pair of points is joined by a single route.
 
-That conclusion is only as good as the placeholder routes. **Re-check it once the real timetable is in.** The pairs to watch are peripheral-to-peripheral, such as New Asia to Shaw College: two points that are both far from the station and on different spurs. If several such pairs come back with no usable single-route option and a long uphill walk, transfers are worth adding — the search in `lib/planner.js` extends to two legs without restructuring.
+Two real limitations remain, both of which cause the app to **omit** options
+rather than invent them:
 
----
+- **No wrap-around on loop routes.** A route is stored as an ordered list and
+  the search only rides forward through it, so you can board at position *i*
+  and alight at *j > i*. On a loop, riding past the terminus and round again is
+  a real journey the app will not offer. It was left out deliberately: allowing
+  it would also let the app propose riding twenty minutes around the whole
+  campus to reach a stop five minutes' walk away.
+- **No route-to-route transfers**, as scoped.
+
+In both cases the direct walk is always present, so the user is never left with
+nothing — just occasionally with less than the full set.
 
 ## Layout
 
 ```
-index.html                  markup
-assets/styles.css           mobile-first, high contrast, light + dark
-app.js                      UI, formatting, GPS, map
-lib/geo.js                  distance, Tobler walking model, elevation interpolation
-lib/planner.js              journey search, ranking, departures, peak warnings
-lib/search.js               fuzzy matching over English, Chinese and aliases
-data/shuttle-data.js        ← the only file you edit each term
-data/places.generated.js    auto-generated, do not hand-edit
-scripts/extract-places.js   regenerates the above
+index.html                    markup
+assets/styles.css             mobile-first, high contrast, light + dark
+app.js                        UI, formatting, GPS, map
+lib/geo.js                    distance, Tobler walking model, elevation interpolation
+lib/planner.js                journey search, ranking, departures, peak warnings
+lib/search.js                 fuzzy matching over English, Chinese and aliases
+
+data/shuttle-data.js          ← stops, config, aliases. The file you edit.
+data/routes.generated.js      auto-generated from the timetable PDFs
+data/places.generated.js      auto-generated from OpenStreetMap
+
+scripts/extract-timetable.py  PDFs → routes.generated.js
+scripts/_pdfpos.py            positional PDF text extraction (used by the above)
+scripts/extract-places.js     Overpass + elevations → places.generated.js
+scripts/validate-data.js      sanity-checks the data; exits non-zero on failure
 ```
 
 ## Attribution

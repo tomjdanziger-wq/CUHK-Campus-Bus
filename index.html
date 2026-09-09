@@ -17,6 +17,11 @@
   <span id="placeholder-banner-text"></span>
 </div>
 
+<!-- Shown while ride times between stops are estimated rather than published. -->
+<div id="estimate-banner" class="banner banner--warn" hidden>
+  <span id="estimate-banner-text"></span>
+</div>
+
 <header class="header">
   <h1>Walk or shuttle?</h1>
   <p class="header__sub">Every time below is an estimate. You decide.</p>
@@ -110,6 +115,7 @@
 <!-- Data first, then logic, then the app. Plain scripts — no build step, and
      it works straight off the filesystem as well as from a server. -->
 <script src="data/places.generated.js"></script>
+<script src="data/routes.generated.js"></script>
 <script src="data/shuttle-data.js"></script>
 <script src="lib/geo.js"></script>
 <script src="lib/planner.js"></script>

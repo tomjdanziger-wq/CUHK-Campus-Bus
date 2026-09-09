@@ -140,11 +140,26 @@
       banner.hidden = false;
     }
 
+    // Ride times are the weakest number in the app when they are estimated
+    // rather than published, and the user cannot tell that from a card alone.
+    if (DATA.meta.rideTimesEstimated) {
+      $('estimate-banner-text').textContent =
+        'Departure times are the real published ones. Time spent ON the bus is ' +
+        'estimated from distance — CUHK does not publish stop-to-stop running times.';
+      $('estimate-banner').hidden = false;
+    }
+
     var m = DATA.meta;
-    $('validity').textContent =
-      'Timetable: ' + m.timetableLabel +
-      ' · valid ' + m.validFrom + ' to ' + m.validUntil +
-      ' · last updated ' + m.lastUpdated + '.';
+    var validity = 'Timetable: ' + m.timetableLabel;
+    if (m.validFrom && m.validUntil) {
+      validity += ' · valid ' + m.validFrom + ' to ' + m.validUntil;
+    } else if (m.extractedOn) {
+      // No validity window is printed on the source pages, so say when we
+      // took the data rather than implying it is current.
+      validity += ' · taken from the Transport Office pages on ' + m.extractedOn +
+                  '. Check the official page if that looks old.';
+    }
+    $('validity').textContent = validity;
 
     $('attribution').textContent = DATA.attribution;
   }
@@ -389,7 +404,8 @@
     head.appendChild(el('span', 'opt__icon', '🚌'));
 
     var titles = el('div', 'opt__titles');
-    titles.appendChild(el('h2', 'opt__mode', o.route.name));
+    titles.appendChild(el('h2', 'opt__mode',
+      o.route.name + (o.route.label ? ' · ' + o.route.label : '')));
     if (o.route.nameZh) titles.appendChild(el('span', 'opt__mode-zh', o.route.nameZh));
     head.appendChild(titles);
 

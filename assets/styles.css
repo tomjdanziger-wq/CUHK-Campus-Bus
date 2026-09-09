@@ -79,6 +79,7 @@ body {
   border-bottom: 3px solid currentColor;
 }
 .banner--danger { background: var(--danger-bg); color: var(--danger); }
+.banner--warn   { background: var(--warn-bg);   color: var(--warn); }
 .banner strong { display: inline; }
 
 /* --- header ------------------------------------------------------------- */

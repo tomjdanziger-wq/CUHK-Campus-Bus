@@ -28,7 +28,10 @@
     when: null,            // Date, or null meaning "now"
     selectedKey: null,
     map: null,
-    mapLoading: false
+    mapLoading: false,
+    ghostLayer: null,
+    activeLayer: null,
+    walkRouter: null
   };
 
   // =========================================================================
@@ -392,6 +395,8 @@
       body.appendChild(climb);
     }
 
+    body.appendChild(mapButton(o));
+
     card.appendChild(body);
     return card;
   }
@@ -509,8 +514,17 @@
       body.appendChild(note);
     }
 
-    // Selecting an option only changes what the map draws. It is not a
-    // commitment and nothing is pre-selected.
+    body.appendChild(mapButton(o));
+
+    card.appendChild(body);
+    return card;
+  }
+
+  /**
+   * Selecting an option only changes what the map draws. It is not a
+   * commitment, and nothing is ever pre-selected on the user's behalf.
+   */
+  function mapButton(o) {
     var pick = el('button', 'pick', 'Show this on the map');
     pick.type = 'button';
     pick.setAttribute('aria-pressed', String(state.selectedKey === o.key));
@@ -520,10 +534,7 @@
       render();
       if (state.selectedKey) showMapFor(o);
     });
-    body.appendChild(pick);
-
-    card.appendChild(body);
-    return card;
+    return pick;
   }
 
   function legRow(icon, main, sub, timeText, extraClass) {
@@ -610,12 +621,23 @@
     return state.mapLoading;
   }
 
+  /**
+   * Draw the map.
+   *
+   * Every shuttle route is drawn faintly, so you can see the shape of the
+   * network. The option you are actually looking at is drawn on top in that
+   * route's own colour, and only for the stretch you would ride — boarding
+   * stop to alighting stop, not the whole loop. Walking legs are dashed, in
+   * the walk colour, and follow real footpaths rather than cutting through
+   * buildings.
+   */
   function showMapFor(option) {
     var container = $('map');
     var toggle = $('map-toggle');
 
     container.hidden = false;
     $('map-note').hidden = false;
+    $('map-legend').hidden = false;
     toggle.setAttribute('aria-expanded', 'true');
     toggle.textContent = 'Hide map';
 
@@ -626,54 +648,153 @@
           maxZoom: 19,
           attribution: '© OpenStreetMap contributors'
         }).addTo(state.map);
+
+        state.ghostLayer = L.layerGroup().addTo(state.map);
+        state.activeLayer = L.layerGroup().addTo(state.map);
+        drawGhostNetwork(L);
       }
+
       var map = state.map;
+      state.activeLayer.clearLayers();
 
-      // Clear previous drawing.
-      map.eachLayer(function (layer) {
-        if (layer instanceof L.TileLayer) return;
-        map.removeLayer(layer);
-      });
+      var bounds = [];
+      var add = function (pts) { for (var i = 0; i < pts.length; i++) bounds.push(pts[i]); };
 
-      var points = [];
+      // --- the ridden stretch, in the route's colour ---
+      if (option.kind === 'shuttle') {
+        var ridden = riddenShape(option);
+        if (ridden.length > 1) {
+          // A white casing underneath makes the colour legible over any tile.
+          L.polyline(ridden, { color: '#ffffff', weight: 11, opacity: 0.9 })
+            .addTo(state.activeLayer);
+          L.polyline(ridden, {
+            color: option.route.colour, weight: 6, opacity: 1, lineJoin: 'round'
+          }).addTo(state.activeLayer).bindPopup(
+            option.route.name + (option.route.label ? ' · ' + option.route.label : ''));
+          add(ridden);
+        }
+      }
 
-      function marker(p, label, colour) {
+      // --- walking legs, dashed, on real paths ---
+      var walkColour = CFG.walkColour || '#1b7f4d';
+      function drawWalk(from, to) {
+        if (!from || !to) return;
+        var line = walkLine(from, to);
+        if (line.length < 2) return;
+        L.polyline(line, {
+          color: walkColour, weight: 5, opacity: 0.95,
+          dashArray: '2 9', lineCap: 'round'
+        }).addTo(state.activeLayer);
+        add(line);
+      }
+
+      if (option.kind === 'walk') {
+        drawWalk(state.origin, state.destination);
+      } else {
+        drawWalk(state.origin, option.boardStop);
+        drawWalk(option.alightStop, state.destination);
+      }
+
+      // --- markers ---
+      function marker(p, label, colour, radius) {
         if (!p) return;
         L.circleMarker([p.lat, p.lng], {
-          radius: 9, color: '#fff', weight: 3, fillColor: colour, fillOpacity: 1
-        }).addTo(map).bindPopup(label);
-        points.push([p.lat, p.lng]);
+          radius: radius || 8, color: '#ffffff', weight: 3,
+          fillColor: colour, fillOpacity: 1
+        }).addTo(state.activeLayer).bindPopup(label);
+        bounds.push([p.lat, p.lng]);
       }
-
-      marker(state.origin, 'Start: ' + state.origin.name, '#1c6b45');
-      marker(state.destination, 'Destination: ' + state.destination.name, '#a11919');
 
       if (option.kind === 'shuttle') {
-        var line = option.route.stops
-          .slice(option.boardIndex, option.alightIndex + 1)
-          .map(function (id) {
-            var s = DATA.stops.filter(function (x) { return x.id === id; })[0];
-            return s ? [s.lat, s.lng] : null;
-          })
-          .filter(Boolean);
-
-        L.polyline(line, { color: '#0b4f8f', weight: 6, opacity: 0.75 }).addTo(map);
-        line.forEach(function (pt) { points.push(pt); });
-
-        marker(option.boardStop, 'Board here: ' + option.boardStop.name, '#0b4f8f');
-        marker(option.alightStop, 'Get off: ' + option.alightStop.name, '#0b4f8f');
+        marker(option.boardStop, 'Board here: ' + option.boardStop.name,
+               option.route.colour, 9);
+        marker(option.alightStop, 'Get off: ' + option.alightStop.name,
+               option.route.colour, 9);
       }
+      marker(state.origin, 'Start: ' + state.origin.name, walkColour);
+      marker(state.destination, 'Destination: ' + state.destination.name, '#a11919');
 
-      if (points.length) map.fitBounds(points, { padding: [40, 40] });
+      if (bounds.length) map.fitBounds(bounds, { padding: [35, 35] });
+      renderLegend(option);
       setTimeout(function () { map.invalidateSize(); }, 0);
 
     }).catch(function () {
       container.hidden = true;
+      $('map-legend').hidden = true;
       $('map-note').hidden = false;
       $('map-note').textContent =
         'The map could not load. Everything above still works — the written ' +
         'instructions are the accurate part anyway.';
     });
+  }
+
+  /** Every route, faint, so the network is visible behind the chosen one. */
+  function drawGhostNetwork(L) {
+    DATA.routes.forEach(function (route) {
+      var shape = DATA.routeShapes[route.id];
+      if (!shape || !shape.line || shape.line.length < 2) return;
+      L.polyline(shape.line, {
+        color: route.colour, weight: 3, opacity: 0.22,
+        interactive: false, lineJoin: 'round'
+      }).addTo(state.ghostLayer);
+    });
+  }
+
+  /**
+   * The stretch of a route actually ridden. The generated geometry records the
+   * polyline vertex of every stop, so this is an exact slice — deriving it by
+   * proximity would be ambiguous on a loop that passes the same point twice.
+   */
+  function riddenShape(option) {
+    var shape = DATA.routeShapes[option.routeId];
+    if (!shape || !shape.line) {
+      return [[option.boardStop.lat, option.boardStop.lng],
+              [option.alightStop.lat, option.alightStop.lng]];
+    }
+    var idx = shape.stopIndices || [];
+    var a = idx[option.boardIndex], b = idx[option.alightIndex];
+    if (typeof a !== 'number' || typeof b !== 'number' || b <= a) {
+      return [[option.boardStop.lat, option.boardStop.lng],
+              [option.alightStop.lat, option.alightStop.lng]];
+    }
+    return shape.line.slice(a, b + 1);
+  }
+
+  /** A walking leg along real footpaths, falling back to a straight line. */
+  function walkLine(from, to) {
+    if (!state.walkRouter && window.CUHK.WalkRouter && DATA.walkGraph) {
+      state.walkRouter = new window.CUHK.WalkRouter(DATA.walkGraph);
+    }
+    if (state.walkRouter) {
+      var routed = state.walkRouter.route(from, to);
+      if (routed && routed.points.length > 1) return routed.points;
+    }
+    return [[from.lat, from.lng], [to.lat, to.lng]];
+  }
+
+  /** Name the colours on screen, so the lines mean something. */
+  function renderLegend(option) {
+    var box = $('map-legend');
+    box.innerHTML = '';
+
+    function row(colour, label, dashed) {
+      var item = el('span', 'legend__item');
+      var swatch = el('span', 'legend__swatch' + (dashed ? ' legend__swatch--dashed' : ''));
+      swatch.style.background = dashed ? 'transparent' : colour;
+      if (dashed) swatch.style.borderTopColor = colour;
+      item.appendChild(swatch);
+      item.appendChild(el('span', null, label));
+      box.appendChild(item);
+    }
+
+    if (option.kind === 'shuttle') {
+      row(option.route.colour,
+          option.route.name + (option.route.label ? ' · ' + option.route.label : ''));
+    }
+    row(CFG.walkColour || '#1b7f4d', 'Your walk', true);
+    var faint = el('span', 'legend__item legend__item--muted');
+    faint.textContent = 'Faint lines are the other shuttle routes.';
+    box.appendChild(faint);
   }
 
   function wireMapToggle() {
@@ -683,6 +804,7 @@
       if (open) {
         $('map').hidden = true;
         $('map-note').hidden = true;
+        $('map-legend').hidden = true;
         toggle.setAttribute('aria-expanded', 'false');
         toggle.textContent = 'Show map';
         return;

@@ -71,10 +71,22 @@
 
     walking: {
       // Straight-line distance is multiplied by this to approximate the real
-      // path network (stairs, switchbacks, walking round buildings). CUHK is
-      // hilly with an indirect path network, so this is higher than the ~1.2
-      // you would use for a grid-plan city.
-      detourFactor: 1.3,
+      // path network (stairs, switchbacks, walking round buildings).
+      //
+      // MEASURED, not guessed. Routing 2,739 building-to-stop legs over the
+      // campus footpath network in data/shapes.generated.js gives a ratio of
+      // routed distance to straight-line distance of:
+      //
+      //     p10 1.28   p25 1.43   median 1.69   p75 2.12   p90 2.63
+      //
+      // This started at a guessed 1.3, which underestimated every walk on
+      // campus by about 30%. 1.65 sits just under the measured median, on the
+      // grounds that OpenStreetMap does not map every covered walkway, podium
+      // shortcut and lift, so the router detours where a person would not.
+      //
+      // Re-measure after changing the footpath data:
+      //   node scripts/calibrate-walk.js
+      detourFactor: 1.65,
 
       // Tobler's hiking function:  v = 6 · exp(−3.5 · |slope + 0.05|)  km/h
       // It peaks at a gentle −5% downhill and falls off steeply uphill, which
@@ -155,6 +167,22 @@
       notableElevationMetres: 15
     },
 
+    // Route colours, used to draw each line on the map. Chosen to stay apart
+    // from each other and to read against OpenStreetMap tiles in both themes.
+    // 2S is a deliberate sibling shade of 2 — it is a variant of that route.
+    routeColours: {
+      '1':  '#d1495b',   // Main Campus      — crimson
+      '2':  '#0b6e99',   // NA / UC          — deep blue
+      '2S': '#4ea3d1',   // NA / UC (S)      — light blue
+      '3':  '#e07a1f',   // Shaw             — orange
+      '4':  '#7b52ab',   // Campus Circuit   — purple
+      '8':  '#00857a',   // Western Campus   — teal
+      'N':  '#3f4e7a',   // Night Service    — indigo
+      'H':  '#b5179e'    // Holidays Service — magenta
+    },
+    fallbackRouteColour: '#555f6b',
+    walkColour: '#1b7f4d',
+
     // Capacity warnings. Static, not real-time — we have no occupancy data.
     peakPeriods: [
       { start: '08:30', end: '09:30', days: 'mon-fri',
@@ -230,6 +258,7 @@
     var seg = rideTimes[r.id];
     return {
       id: r.id,
+      colour: config.routeColours[r.id] || config.fallbackRouteColour,
       name: r.name,
       nameZh: r.nameZh,
       label: r.label,
@@ -333,8 +362,15 @@
     });
   });
 
+  // Road geometry and the walking network, from scripts/extract-geometry.js.
+  // Optional: without it the map falls back to straight lines between stops
+  // and everything else still works.
+  var shapes = root.CUHK_SHAPES_GENERATED || { routeShapes: {}, walkGraph: null };
+
   root.SHUTTLE_DATA = {
     meta: meta,
+    routeShapes: shapes.routeShapes,
+    walkGraph: shapes.walkGraph,
     config: config,
     stops: stops,
     routes: routes,

@@ -187,7 +187,14 @@ Google Places is deliberately not used: it needs a key and billing, and its term
 No routing API. From `lib/geo.js`:
 
 1. Haversine distance between the two points.
-2. Multiplied by `config.walking.detourFactor` (1.3) to approximate the real path network.
+2. Multiplied by `config.walking.detourFactor` (**1.65**) to approximate the real
+   path network. This is measured, not guessed: `scripts/calibrate-walk.js`
+   routes 2,739 building-to-stop legs over the campus footpath network and
+   reports the ratio of routed to straight-line distance — p25 1.43, **median
+   1.69**, p75 2.12. It started life as a guessed 1.3, which underestimated
+   every walk on campus by about 30%. 1.65 sits just under the median, because
+   OpenStreetMap does not map every covered walkway, podium shortcut and lift,
+   so the router detours where a person would not.
 3. Converted to time by **Tobler's hiking function**, `v = 6 · exp(−3.5 · |slope + 0.05|)` km/h, using the average gradient. It peaks at a gentle downhill and falls off sharply uphill, which matches how this campus actually feels. Scaled by `toblerCalibration` (0.85) to a realistic student pace — about 4.3 km/h on the flat.
 4. Widened into a range (`rangeLow` 0.8, `rangeHigh` 1.35). Asymmetric, because these estimates fail long far more often than short.
 
@@ -253,6 +260,54 @@ The last one is not in the original spec and was added because the numbers deman
 
 ---
 
+## Map
+
+The map is secondary — the written instructions are the product — but it is no
+longer decorative. Route lines follow the actual streets, because a line drawn
+straight through a building undermines the directions printed next to it.
+
+**Bus routes** are precomputed offline by `scripts/extract-geometry.js`. It
+pulls the campus road network from Overpass, builds a directed graph honouring
+one-way streets (joining ways where they share a coordinate, since Overpass's
+`out geom` gives no node ids), snaps every stop to it, and runs Dijkstra between
+consecutive stops. The result ships as static geometry in
+`data/shapes.generated.js` — no routing service, no key, no runtime cost.
+
+The script also records the polyline vertex of each stop, so the app can
+highlight exactly the stretch you would ride. Deriving that by proximity would
+be ambiguous on a loop that passes the same point twice.
+
+**Walking legs** cannot be precomputed — they start wherever you are standing.
+So the same script ships a compact routable footpath network (7,532 nodes, 8,020
+edges, coordinates as integers scaled by 1e6) and `lib/walkroute.js` runs
+Dijkstra over it in the browser, in a couple of milliseconds.
+
+**What you see:** every shuttle route drawn faintly, so the shape of the network
+is visible; the option you are looking at drawn on top in that route's own
+colour, for the ridden stretch only; your walking legs dashed in green on real
+footpaths. The basemap is desaturated so the route colours carry the meaning.
+Route colours live in `config.routeColours`.
+
+The whole thing is 312 KB raw, 64 KB gzipped, and lazy-loaded: if Leaflet or the
+tiles fail, the map hides itself and every written instruction still works.
+
+### Regenerating the geometry
+
+```bash
+node scripts/extract-geometry.js     # re-routes every line; caches the Overpass reply
+node scripts/calibrate-walk.js       # re-measures the walking detour factor
+```
+
+Run these after changing stops or routes. `extract-geometry.js` names any hop it
+could not route on roads and falls back to a straight line for it — currently
+none do.
+
+> The router's sanity check on a routed hop is deliberately loose (6× the
+> straight-line distance). This campus climbs 140 m in a kilometre, so roads
+> switchback hard: the 142 m hop from Science Centre to New Asia Circle gains
+> 39 m, which would be a 27% grade in a straight line, and is really 506 m of
+> road. A tighter ratio rejects correct geometry.
+
 ## Deliberately not built (v1)
 
 - Real-time tracking. There is no data source, and no amount of UI would make one up honestly.
@@ -291,14 +346,18 @@ app.js                        UI, formatting, GPS, map
 lib/geo.js                    distance, Tobler walking model, elevation interpolation
 lib/planner.js                journey search, ranking, departures, peak warnings
 lib/search.js                 fuzzy matching over English, Chinese and aliases
+lib/walkroute.js              in-browser Dijkstra over the campus footpath network
 
 data/shuttle-data.js          ← stops, config, aliases. The file you edit.
 data/routes.generated.js      auto-generated from the timetable PDFs
 data/places.generated.js      auto-generated from OpenStreetMap
+data/shapes.generated.js      auto-generated road geometry + walking graph
 
 scripts/extract-timetable.py  PDFs → routes.generated.js
 scripts/_pdfpos.py            positional PDF text extraction (used by the above)
 scripts/extract-places.js     Overpass + elevations → places.generated.js
+scripts/extract-geometry.js   road network → route polylines + walking graph
+scripts/calibrate-walk.js     measures the walking detour factor from real paths
 scripts/validate-data.js      sanity-checks the data; exits non-zero on failure
 ```
 

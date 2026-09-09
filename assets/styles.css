@@ -459,7 +459,48 @@ button:focus-visible {
   background: var(--surface-2);
 }
 .map-note { margin: 8px 0 0; font-size: 14px; color: var(--ink-3); }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.legend__item { display: flex; align-items: center; gap: 7px; color: var(--ink-2); }
+.legend__item--muted { color: var(--ink-3); font-style: italic; }
+.legend__swatch {
+  width: 22px;
+  height: 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.legend__swatch--dashed {
+  height: 0;
+  border-top: 5px dotted currentColor;
+  border-radius: 0;
+}
 .leaflet-container { border-radius: 10px; font: inherit; }
+
+/* Mute the basemap. OpenStreetMap's default tiles are colourful enough to
+   compete with the route lines drawn on top, and the route is the point.
+   Leaflet sets `filter` on tiles itself while they fade in, so this needs to
+   be at least as specific and marked important to survive. */
+.map .leaflet-tile,
+.map .leaflet-tile-loaded {
+  filter: saturate(0.4) brightness(1.06) contrast(0.92) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .map .leaflet-tile,
+  .map .leaflet-tile-loaded {
+    filter: saturate(0.35) brightness(0.8) contrast(1.05) !important;
+  }
+}
 
 /* --- footer ------------------------------------------------------------- */
 

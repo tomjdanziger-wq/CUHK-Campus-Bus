@@ -1,3 +1,6 @@
 .DS_Store
 __pycache__/
 *.pyc
+
+# Cached Overpass reply for scripts/extract-geometry.js — 1.2 MB, regenerable.
+.overpass-roads.json

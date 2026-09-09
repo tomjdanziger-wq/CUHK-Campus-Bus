@@ -1,0 +1,24 @@
+/**
+ * routes.generated.js — AUTO-GENERATED from the Transport Office route PDFs.
+ * Do not edit by hand; edit the PDFs' source and re-run:
+ *
+ *     python3 scripts/extract-timetable.py *.pdf > data/routes.generated.js
+ *
+ * Service hours, departure minutes and stop sequences are as published.
+ * `segmentMinutes` is deliberately absent — the Transport Office does not
+ * publish running times between stops, so the app estimates the ride leg and
+ * labels it as estimated. See scripts/extract-timetable.py for details.
+ */
+(function (root) {
+  'use strict';
+  root.CUHK_ROUTES_GENERATED = [
+    {"id": "1", "name": "Route 1", "nameZh": "本部線", "label": "Main Campus", "stops": ["univ-station", "univ-sports-centre", "sir-run-run-shaw-hall", "univ-admin", "sh-ho-college", "univ-station"], "departureMinutes": [10, 25, 40, 55], "firstDeparture": "07:40", "lastDeparture": "18:55", "runsOn": "mon-sat", "notes": null},
+    {"id": "2", "name": "Route 2", "nameZh": "新亞聯合線", "label": "NA : UC", "stops": ["station-piazza", "univ-sports-centre", "sir-run-run-shaw-hall", "fung-king-hey", "united-college-up", "new-asia-college", "united-college-down", "univ-admin", "sh-ho-college", "univ-station"], "departureMinutes": [15, 45], "firstDeparture": "07:45", "lastDeparture": "18:45", "runsOn": "mon-sat", "notes": "Buses departing from 31 to 00 minutes will stop at Sir Run Run Shaw Hall"},
+    {"id": "3", "name": "Route 3", "nameZh": "逸夫線", "label": "Shaw", "stops": ["yiap", "univ-sports-centre", "science-centre", "fung-king-hey", "wu-yee-sun-up", "shaw-college-up", "cw-chu-down", "residence-15", "uc-staff-residence", "chan-chun-ha", "shaw-college-down", "wu-yee-sun-down", "univ-admin", "sh-ho-college", "station-piazza"], "departureMinutes": [0, 20, 40], "firstDeparture": "09:00", "lastDeparture": "18:40", "runsOn": "mon-sat", "notes": null},
+    {"id": "4", "name": "Route 4", "nameZh": "環校線", "label": "Campus Circuit", "stops": ["yiap", "campus-circuit-east-up", "cw-chu-up", "area-39-up", "cw-chu-down", "residence-15", "uc-staff-residence", "chan-chun-ha", "shaw-college-down", "wu-yee-sun-down", "new-asia-college", "united-college-down", "univ-admin", "sh-ho-college", "univ-station"], "departureMinutes": [10, 30, 50], "firstDeparture": "07:30", "lastDeparture": "18:50", "runsOn": "mon-sat", "notes": null},
+    {"id": "8", "name": "Route 8", "nameZh": "西部校園線", "label": "Western Campus", "stops": ["yiap", "campus-circuit-east-up", "cw-chu-up", "area-39-up", "cw-chu-down", "uc-staff-residence", "chan-chun-ha", "shaw-college-down", "wu-yee-sun-down", "univ-admin", "science-centre", "new-asia-circle", "united-college-down", "wu-yee-sun-up", "shaw-college-up", "area-39-down", "campus-circuit-north-down", "campus-circuit-east-down", "univ-station", "station-piazza", "chung-chi-teaching"], "departureMinutes": [15, 35, 55], "firstDeparture": "07:35", "lastDeparture": "18:35", "runsOn": "mon-sat", "notes": "During non-teaching days, buses will stop at Station Piazza & Chung Chi Teaching Bldg. (without stopping at Univ. Station)"},
+    {"id": "H", "name": "Route H", "nameZh": "假日線", "label": "Holidays Service", "stops": ["univ-station", "postgrad-hall-1", "univ-sports-centre", "sir-run-run-shaw-hall", "new-asia-circle", "united-college-down", "wu-yee-sun-up", "shaw-college-up", "area-39-up", "cw-chu-down", "residence-15", "uc-staff-residence", "chan-chun-ha", "shaw-college-down", "wu-yee-sun-down", "new-asia-college", "united-college-down", "univ-admin", "sh-ho-college", "postgrad-hall-1", "univ-station"], "departureMinutes": [0, 20, 40], "firstDeparture": "08:20", "lastDeparture": "23:20", "runsOn": "sun-ph", "notes": "Buses departing at 00 minute will stop at Postgraduate Hall 1 and Area 39 (Upward)"},
+    {"id": "N", "name": "Route N", "nameZh": "夜間線", "label": "Night Service", "stops": ["univ-station", "postgrad-hall-1", "univ-sports-centre", "sir-run-run-shaw-hall", "new-asia-circle", "united-college-down", "wu-yee-sun-up", "shaw-college-up", "area-39-up", "cw-chu-down", "residence-15", "uc-staff-residence", "chan-chun-ha", "shaw-college-down", "wu-yee-sun-down", "new-asia-college", "united-college-down", "univ-admin", "sh-ho-college", "postgrad-hall-1", "univ-station"], "departureMinutes": [0, 15, 30, 45], "firstDeparture": "19:00", "lastDeparture": "23:30", "runsOn": "mon-sat", "notes": "Buses departing at 00 minute will stop at Postgraduate Hall 1"},
+    {"id": "2S", "name": "Route 2S", "nameZh": "新亞聯合線 (S)", "label": "NA:UC (S)", "stops": ["station-piazza", "postgrad-hall-1", "univ-sports-centre", "sir-run-run-shaw-hall", "fung-king-hey", "united-college-up", "new-asia-college", "united-college-down", "univ-admin", "sh-ho-college", "postgrad-hall-1", "univ-station"], "departureMinutes": [0, 30], "firstDeparture": "08:00", "lastDeparture": "18:30", "runsOn": "mon-sat", "notes": null}
+  ];
+})(typeof globalThis !== 'undefined' ? globalThis : this);

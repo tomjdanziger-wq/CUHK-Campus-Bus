@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b3d5c">
+  <meta name="description" content="Walk or take the shuttle? Compare campus shuttle routes and walking times at CUHK.">
+  <title>CUHK Shuttle Helper</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚌</text></svg>">
+</head>
+<body>
+
+<!-- Shown only while data.meta.isPlaceholder is true. -->
+<div id="placeholder-banner" class="banner banner--danger" hidden>
+  <strong>Demo data.</strong>
+  <span id="placeholder-banner-text"></span>
+</div>
+
+<header class="header">
+  <h1>Walk or shuttle?</h1>
+  <p class="header__sub">Every time below is an estimate. You decide.</p>
+</header>
+
+<main class="wrap">
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Trip inputs                                                        -->
+  <!-- ------------------------------------------------------------------ -->
+  <section class="trip" aria-label="Choose your trip">
+
+    <div class="field">
+      <label class="field__label" for="origin-input">From</label>
+      <div class="field__row">
+        <input id="origin-input" class="input" type="search" autocomplete="off"
+               placeholder="Search a building, or use GPS"
+               aria-describedby="origin-status" aria-autocomplete="list" role="combobox"
+               aria-expanded="false" aria-controls="origin-results">
+        <button id="gps-btn" class="icon-btn" type="button" title="Use my location"
+                aria-label="Use my current location">◎</button>
+      </div>
+      <ul id="origin-results" class="results" role="listbox" hidden></ul>
+      <p id="origin-status" class="field__status" role="status"></p>
+      <div id="origin-confirm" class="confirm" hidden>
+        <p class="confirm__q">GPS on campus is unreliable. Nearest stop to you:</p>
+        <div id="origin-confirm-list" class="confirm__list"></div>
+      </div>
+    </div>
+
+    <button id="swap-btn" class="swap" type="button" aria-label="Swap origin and destination">
+      <span aria-hidden="true">⇅</span> Swap
+    </button>
+
+    <div class="field">
+      <label class="field__label" for="dest-input">To</label>
+      <div class="field__row">
+        <input id="dest-input" class="input" type="search" autocomplete="off"
+               placeholder="e.g. United College, 科學館, YIA"
+               aria-autocomplete="list" role="combobox" aria-expanded="false"
+               aria-controls="dest-results">
+      </div>
+      <ul id="dest-results" class="results" role="listbox" hidden></ul>
+      <p id="dest-status" class="field__status" role="status"></p>
+    </div>
+
+    <div class="when">
+      <label class="when__label" for="when-input">Leaving</label>
+      <input id="when-input" class="when__input" type="time" aria-label="Departure time">
+      <button id="now-btn" class="when__now" type="button">Now</button>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Results                                                            -->
+  <!-- ------------------------------------------------------------------ -->
+  <section id="results-section" aria-label="Your options" aria-live="polite">
+    <div id="empty-state" class="empty">
+      <p>Pick where you're going.</p>
+      <p class="empty__hint">Walking is always shown as an option, even when it's slower.</p>
+    </div>
+    <div id="options"></div>
+  </section>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Map (optional, illustrative only)                                  -->
+  <!-- ------------------------------------------------------------------ -->
+  <section id="map-section" class="map-section" hidden>
+    <button id="map-toggle" class="map-toggle" type="button" aria-expanded="false">
+      Show map
+    </button>
+    <div id="map" class="map" hidden role="img"
+         aria-label="Illustrative map of the selected option"></div>
+    <p id="map-note" class="map-note" hidden>
+      The map is illustrative. The written instructions above are the accurate part.
+    </p>
+  </section>
+
+  <footer class="footer">
+    <p id="validity" class="footer__validity"></p>
+    <p class="footer__note">
+      No live tracking. All departure times are <strong>scheduled</strong> times, and
+      buses run late. Walking times assume an unhurried pace and are adjusted for
+      the hills, not for stairs, crowds or rain.
+    </p>
+    <p id="attribution" class="footer__attr"></p>
+  </footer>
+
+</main>
+
+<!-- Data first, then logic, then the app. Plain scripts — no build step, and
+     it works straight off the filesystem as well as from a server. -->
+<script src="data/places.generated.js"></script>
+<script src="data/shuttle-data.js"></script>
+<script src="lib/geo.js"></script>
+<script src="lib/planner.js"></script>
+<script src="lib/search.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

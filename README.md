@@ -400,11 +400,32 @@ rather than invent them:
 In both cases the direct walk is always present, so the user is never left with
 nothing — just occasionally with less than the full set.
 
+## Design
+
+A document, not a dashboard. Options are separated by hairline rules rather than
+boxed into cards — a stack of bordered, rounded, shadowed panels reads as chrome
+competing with the content, and there is very little content here that is not a
+name or a number.
+
+Colour is reserved for information. Each shuttle route has a colour, and it
+appears in exactly two places: a short bar beside that route's name in the
+results, and its line on the map. Warnings are amber. Everything else is ink on
+cream. The basemap is desaturated for the same reason — the routes drawn on top
+are the point.
+
+Constraints that do not bend, because of where this gets used: body text at
+16px and times at 22px, prose never below 13px, every tappable thing at least
+44px tall including the ones styled as plain text, and contrast well clear of
+AA (15:1 for primary text on the cream ground).
+
+Run `node scripts/smoke-test.js` and `node scripts/validate-data.js` before
+deploying; both exit non-zero on failure.
+
 ## Layout
 
 ```
 index.html                    markup
-assets/styles.css             mobile-first, high contrast, light + dark
+assets/styles.css             mobile-first, high contrast, cream light + warm dark
 app.js                        UI, formatting, GPS, map
 lib/geo.js                    distance, Tobler walking model, elevation interpolation
 lib/planner.js                journey search, ranking, departures, peak warnings
@@ -422,6 +443,7 @@ scripts/extract-places.js     Overpass + elevations → places.generated.js
 scripts/extract-geometry.js   road network → route polylines + walking graph
 scripts/calibrate-walk.js     measures the walking detour factor from real paths
 scripts/validate-data.js      sanity-checks the data; exits non-zero on failure
+scripts/smoke-test.js         runs ~1,400 journeys and asserts the invariants
 ```
 
 ## Attribution

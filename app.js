@@ -31,7 +31,11 @@
     mapLoading: false,
     ghostLayer: null,
     activeLayer: null,
-    walkRouter: null
+    walkRouter: null,
+    netMap: null,
+    netLayer: null,
+    netRoute: null,
+    netZoomBound: false
   };
 
   // =========================================================================
@@ -403,6 +407,7 @@
 
   function renderShuttleCard(o) {
     var card = el('div', 'opt opt--bus' + (o.isBest ? ' opt--best' : ''));
+    card.style.setProperty('--route-colour', o.route.colour);
 
     // --- header: route and total time ---
     var head = el('div', 'opt__head');
@@ -818,6 +823,271 @@
     });
   }
 
+
+  // =========================================================================
+  // Network browser
+  //
+  // The journey planner answers "how do I get from A to B". This answers the
+  // other question people actually have: "where do these buses go?" — which
+  // is what you need when you already know the campus and would rather choose
+  // the route yourself than describe a trip.
+  //
+  // Every route is drawn in its own colour, every stop is marked with its
+  // short code, and arrows along each line show which way round the loop the
+  // bus travels. Direction matters more than anything else here: most of
+  // these routes are one-way loops, so boarding on the wrong side of the road
+  // means riding almost the whole campus to get somewhere two minutes away.
+  // =========================================================================
+
+  var ARROW_SPACING_M = 260;
+
+  function bearing(a, b) {
+    var y = Math.sin((b[1] - a[1]) * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180);
+    var x = Math.cos(a[0] * Math.PI / 180) * Math.sin(b[0] * Math.PI / 180) -
+            Math.sin(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) *
+            Math.cos((b[1] - a[1]) * Math.PI / 180);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+
+  function metresBetween(a, b) {
+    return geo.haversineMetres({ lat: a[0], lng: a[1] }, { lat: b[0], lng: b[1] });
+  }
+
+  function wireNetwork() {
+    var toggle = $('network-toggle');
+    var panel = $('network-panel');
+
+    toggle.addEventListener('click', function () {
+      var open = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!open));
+      panel.hidden = open;
+      toggle.classList.toggle('is-open', !open);
+      if (!open) openNetwork();
+    });
+
+    renderNetworkChips();
+  }
+
+  function renderNetworkChips() {
+    var box = $('network-chips');
+    box.innerHTML = '';
+
+    function chip(id, label, colour) {
+      var b = el('button', 'chip');
+      b.type = 'button';
+      b.dataset.route = id || '';
+      b.setAttribute('aria-pressed', String(state.netRoute === id));
+      if (colour) {
+        b.style.setProperty('--chip-colour', colour);
+        b.classList.add('chip--colour');
+      }
+      b.appendChild(el('span', 'chip__dot'));
+      b.appendChild(el('span', null, label));
+      b.addEventListener('click', function () {
+        state.netRoute = state.netRoute === id ? null : id;
+        renderNetworkChips();
+        openNetwork();
+      });
+      box.appendChild(b);
+    }
+
+    chip(null, 'All routes', null);
+    DATA.routes.forEach(function (r) { chip(r.id, r.name.replace('Route ', ''), r.colour); });
+  }
+
+  function openNetwork() {
+    var container = $('network-map');
+
+    loadLeaflet().then(function (L) {
+      if (!state.netMap) {
+        state.netMap = L.map(container, { scrollWheelZoom: false });
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19, attribution: '© OpenStreetMap contributors'
+        }).addTo(state.netMap);
+        state.netLayer = L.layerGroup().addTo(state.netMap);
+      }
+
+      var map = state.netMap;
+      state.netLayer.clearLayers();
+
+      var only = state.netRoute;
+      var bounds = [];
+
+      // --- route lines ---
+      DATA.routes.forEach(function (route) {
+        var shape = DATA.routeShapes[route.id];
+        if (!shape || !shape.line || shape.line.length < 2) return;
+
+        var active = !only || only === route.id;
+        if (active) {
+          L.polyline(shape.line, { color: '#fff', weight: 9, opacity: 0.85 })
+            .addTo(state.netLayer);
+        }
+        L.polyline(shape.line, {
+          color: route.colour,
+          weight: active ? 5 : 2.5,
+          opacity: active ? 0.95 : 0.16,
+          lineJoin: 'round'
+        }).addTo(state.netLayer).bindPopup(
+          '<strong>' + route.name + '</strong><br>' + (route.label || '') +
+          '<br>' + route.firstDeparture + '–' + route.lastDeparture);
+
+        if (active) {
+          // Direction arrows only when one route is selected. Eight sets of
+          // arrows overlapping each other tells you nothing.
+          if (only) drawDirectionArrows(L, shape.line, route.colour);
+          shape.line.forEach(function (pt) { bounds.push(pt); });
+        }
+      });
+
+      // --- stop markers ---
+      var shown = {};
+      DATA.routes.forEach(function (route) {
+        if (only && only !== route.id) return;
+        route.stops.forEach(function (id) { shown[id] = true; });
+      });
+
+      DATA.stops.forEach(function (stop) {
+        var active = !only || shown[stop.id];
+        if (only && !active) return;
+
+        L.marker([stop.lat, stop.lng], {
+          icon: L.divIcon({
+            className: 'stopmark',
+            html: '<span class="stopmark__dot"></span>' +
+                  '<span class="stopmark__pill">' + stop.abbr + '</span>',
+            iconSize: null
+          }),
+          keyboard: false
+        }).addTo(state.netLayer).bindPopup(
+          '<strong>' + stop.name + '</strong>' +
+          (stop.nameZh ? '<br>' + stop.nameZh : '') +
+          '<br>' + stop.elevation + ' m above sea level');
+
+        if (!only) bounds.push([stop.lat, stop.lng]);
+      });
+
+      if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
+
+      // Twenty-nine labelled pills on a campus-wide view overlap into an
+      // unreadable pile, so they collapse to dots until there is room: either
+      // a single route is selected, or the user has zoomed in.
+      function syncLabels() {
+        var roomy = !!only || map.getZoom() >= 16;
+        container.classList.toggle('labels-off', !roomy);
+      }
+      if (!state.netZoomBound) {
+        map.on('zoomend', syncLabels);
+        state.netZoomBound = true;
+      }
+      syncLabels();
+
+      setTimeout(function () { map.invalidateSize(); syncLabels(); }, 0);
+
+    }).catch(function () {
+      container.innerHTML =
+        '<p class="map-note">The map could not load. The stop list below still works.</p>';
+    });
+
+    renderNetworkList();
+  }
+
+  /**
+   * Arrows along a route line. These carry real information: nearly every
+   * route here is a one-way loop, so "which way does it go round" decides
+   * whether the bus is a five-minute ride or a twenty-minute one.
+   */
+  function drawDirectionArrows(L, line, colour) {
+    var carried = 0;
+    for (var i = 0; i < line.length - 1; i++) {
+      var seg = metresBetween(line[i], line[i + 1]);
+      carried += seg;
+      if (carried < ARROW_SPACING_M || seg < 1) continue;
+      carried = 0;
+
+      var angle = bearing(line[i], line[i + 1]);
+      L.marker(line[i + 1], {
+        interactive: false,
+        keyboard: false,
+        icon: L.divIcon({
+          className: 'arrowmark',
+          html: '<span class="arrowmark__glyph" style="transform:rotate(' +
+                (angle - 90) + 'deg);color:' + colour + '">➤</span>',
+          iconSize: null
+        })
+      }).addTo(state.netLayer);
+    }
+  }
+
+  function renderNetworkList() {
+    var summary = $('network-summary');
+    var list = $('network-stops');
+    list.innerHTML = '';
+
+    if (!state.netRoute) {
+      summary.textContent =
+        DATA.routes.length + ' routes, ' + DATA.stops.length + ' stops. ' +
+        'Pick a route above to see where it goes and which way round it runs. ' +
+        'Arrows on the map show the direction of travel.';
+      list.hidden = true;
+      return;
+    }
+
+    var route = DATA.routes.filter(function (r) { return r.id === state.netRoute; })[0];
+    if (!route) return;
+
+    var byId = {};
+    DATA.stops.forEach(function (s) { byId[s.id] = s; });
+
+    summary.innerHTML = '';
+    var head = el('strong', null, route.name + (route.label ? ' · ' + route.label : ''));
+    head.style.color = route.colour;
+    summary.appendChild(head);
+    summary.appendChild(document.createTextNode(
+      ' — ' + route.firstDeparture + ' to ' + route.lastDeparture + ', ' +
+      describeDays(route.runsOn) + ', departing at ' +
+      route.departureMinutes.map(function (m) {
+        return ':' + String(m).padStart(2, '0');
+      }).join(', ') + ' past the hour from ' +
+      (byId[route.stops[0]] ? byId[route.stops[0]].name : 'the first stop') + '.'));
+
+    if (route.notes) {
+      var note = el('span', 'network__note', ' ' + route.notes);
+      summary.appendChild(note);
+    }
+
+    list.hidden = false;
+    route.stops.forEach(function (id, i) {
+      var stop = byId[id];
+      if (!stop) return;
+      var li = el('li', 'stoplist__item');
+      li.style.setProperty('--route-colour', route.colour);
+
+      var code = el('span', 'stoplist__code', stop.abbr);
+      li.appendChild(code);
+
+      var text = el('span', 'stoplist__text');
+      text.appendChild(el('span', 'stoplist__name', stop.name));
+      if (stop.nameZh) text.appendChild(el('span', 'stoplist__zh', stop.nameZh));
+      li.appendChild(text);
+
+      var meta = el('span', 'stoplist__meta',
+        i === 0 ? 'first stop' : i === route.stops.length - 1 ? 'last stop' : stop.elevation + ' m');
+      li.appendChild(meta);
+
+      list.appendChild(li);
+    });
+  }
+
+  function describeDays(runsOn) {
+    if (runsOn === 'mon-fri') return 'Monday to Friday';
+    if (runsOn === 'mon-sat') return 'Monday to Saturday';
+    if (runsOn === 'sun-ph') return 'Sundays and public holidays';
+    if (runsOn === 'sat') return 'Saturdays';
+    if (runsOn === 'daily') return 'every day';
+    return runsOn;
+  }
+
   // =========================================================================
   // Wiring
   // =========================================================================
@@ -881,6 +1151,7 @@
     });
 
     wireMapToggle();
+    wireNetwork();
 
     // Waits count down in real time, so a stale screen is a wrong screen.
     setInterval(function () { if (!state.when) render(); }, 30000);

@@ -201,40 +201,44 @@
   // `elevation` is metres above sea level and is REQUIRED: it drives the
   // walking estimate, and a wrong value produces confidently wrong advice.
   //
+  // `abbr` is the short code shown on the network map, where full names would
+  // overlap into an unreadable mess. The ↑ / ↓ suffix is the uphill/downhill
+  // side of the road, matching the Transport Office's own naming.
+  //
   // Several stops exist as an (Upward)/(Downward) pair on opposite sides of
   // the road. Where OpenStreetMap maps only one of the pair, both share that
   // position — they are metres apart, well inside the walking model's error.
   // -------------------------------------------------------------------------
   var stops = [
-    { id: 'univ-station'              , name: "University Station"                   , nameZh: "大學站", lat: 22.414537, lng: 114.210221, elevation:   7 },
-    { id: 'station-piazza'            , name: "University Station Piazza"            , nameZh: "港鐵大學站廣場", lat: 22.413808, lng: 114.209437, elevation:  10 },
-    { id: 'chung-chi-teaching'        , name: "Chung Chi Teaching Blocks"            , nameZh: "崇基教學樓", lat: 22.416036, lng: 114.208359, elevation:  12 },
-    { id: 'yiap'                      , name: "Yasumoto International Academic Park" , nameZh: "康本國際學術園", lat: 22.415973, lng: 114.210832, elevation:  19 },
-    { id: 'univ-sports-centre'        , name: "University Sports Centre"             , nameZh: "大學體育中心", lat: 22.417812, lng: 114.210482, elevation:  45 },
-    { id: 'sh-ho-college'             , name: "S.H. Ho College"                      , nameZh: "善衡書院", lat: 22.418042, lng: 114.209850, elevation:  49 },
-    { id: 'postgrad-hall-1'           , name: "Postgraduate Hall 1"                  , nameZh: "賽馬會研究生宿舍一座", lat: 22.420248, lng: 114.212171, elevation:  32 },
-    { id: 'campus-circuit-east-up'    , name: "Campus Circuit East (Upward)"         , nameZh: "環迴東路（上行）", lat: 22.421533, lng: 114.211835, elevation:  55 },  // APPROXIMATE — road-side stop, position not in OSM
-    { id: 'campus-circuit-east-down'  , name: "Campus Circuit East (Downward)"       , nameZh: "環迴東路（下行）", lat: 22.421533, lng: 114.211835, elevation:  55 },  // APPROXIMATE — road-side stop, position not in OSM
-    { id: 'campus-circuit-north-down' , name: "Campus Circuit North (Downward)"      , nameZh: "環迴北路（下行）", lat: 22.424445, lng: 114.209261, elevation:  11 },  // APPROXIMATE — road-side stop, position not in OSM
-    { id: 'sir-run-run-shaw-hall'     , name: "Sir Run Run Shaw Hall"                , nameZh: "邵逸夫堂", lat: 22.419841, lng: 114.206942, elevation: 102 },
-    { id: 'science-centre'            , name: "Science Centre"                       , nameZh: "科學館", lat: 22.419830, lng: 114.207342, elevation: 102 },
-    { id: 'fung-king-hey'             , name: "Fung King Hey Building"               , nameZh: "馮景禧樓", lat: 22.419864, lng: 114.203032, elevation: 113 },
-    { id: 'univ-admin'                , name: "University Administration Building"   , nameZh: "大學行政樓", lat: 22.418806, lng: 114.205358, elevation: 100 },
-    { id: 'united-college-up'         , name: "United College (Upward)"              , nameZh: "聯合書院（上行）", lat: 22.420390, lng: 114.205394, elevation: 136 },
-    { id: 'united-college-down'       , name: "United College (Downward)"            , nameZh: "聯合書院（下行）", lat: 22.420302, lng: 114.205340, elevation: 133 },
-    { id: 'new-asia-college'          , name: "New Asia College"                     , nameZh: "新亞書院", lat: 22.421271, lng: 114.207559, elevation: 142 },
-    { id: 'new-asia-circle'           , name: "New Asia Circle"                      , nameZh: "新亞坊", lat: 22.421072, lng: 114.207647, elevation: 141 },
-    { id: 'wu-yee-sun-up'             , name: "Wu Yee Sun College (Upward)"          , nameZh: "伍宜孫書院（上行）", lat: 22.421331, lng: 114.203471, elevation: 114 },
-    { id: 'wu-yee-sun-down'           , name: "Wu Yee Sun College (Downward)"        , nameZh: "伍宜孫書院（下行）", lat: 22.421199, lng: 114.203521, elevation: 116 },
-    { id: 'chan-chun-ha'              , name: "Chan Chun Ha Hostel"                  , nameZh: "陳震夏宿舍", lat: 22.421812, lng: 114.204612, elevation: 119 },
-    { id: 'shaw-college-up'           , name: "Shaw College (Upward)"                , nameZh: "逸夫書院（上行）", lat: 22.422486, lng: 114.201315, elevation:  82 },  // up/down stops share one mapped position
-    { id: 'shaw-college-down'         , name: "Shaw College (Downward)"              , nameZh: "逸夫書院（下行）", lat: 22.422486, lng: 114.201315, elevation:  82 },  // up/down stops share one mapped position
-    { id: 'uc-staff-residence'        , name: "United College Staff Residence"       , nameZh: "聯合苑", lat: 22.423259, lng: 114.205130, elevation:  83 },
-    { id: 'residence-15'              , name: "Residence No. 15"                     , nameZh: "十五苑", lat: 22.423716, lng: 114.206598, elevation:  62 },
-    { id: 'cw-chu-up'                 , name: "C.W. Chu College (Upward)"            , nameZh: "敬文書院（上行）", lat: 22.425557, lng: 114.206218, elevation:  23 },  // up/down stops share one mapped position
-    { id: 'cw-chu-down'               , name: "C.W. Chu College (Downward)"          , nameZh: "敬文書院（下行）", lat: 22.425557, lng: 114.206218, elevation:  23 },  // up/down stops share one mapped position
-    { id: 'area-39-up'                , name: "Area 39 (Upward)"                     , nameZh: "三十九區（上行）", lat: 22.427631, lng: 114.204351, elevation:   9 },  // up/down stops share one mapped position
-    { id: 'area-39-down'              , name: "Area 39 (Downward)"                   , nameZh: "三十九區（下行）", lat: 22.427631, lng: 114.204351, elevation:   9 },  // up/down stops share one mapped position
+    { id: 'univ-station'              , name: "University Station"                   , nameZh: "大學站", lat: 22.414537, lng: 114.210221, elevation:   7 , abbr: 'MTR' },
+    { id: 'station-piazza'            , name: "University Station Piazza"            , nameZh: "港鐵大學站廣場", lat: 22.413808, lng: 114.209437, elevation:  10 , abbr: 'PZA' },
+    { id: 'chung-chi-teaching'        , name: "Chung Chi Teaching Blocks"            , nameZh: "崇基教學樓", lat: 22.416036, lng: 114.208359, elevation:  12 , abbr: 'CCT' },
+    { id: 'yiap'                      , name: "Yasumoto International Academic Park" , nameZh: "康本國際學術園", lat: 22.415973, lng: 114.210832, elevation:  19 , abbr: 'YIA' },
+    { id: 'univ-sports-centre'        , name: "University Sports Centre"             , nameZh: "大學體育中心", lat: 22.417812, lng: 114.210482, elevation:  45 , abbr: 'SPT' },
+    { id: 'sh-ho-college'             , name: "S.H. Ho College"                      , nameZh: "善衡書院", lat: 22.418042, lng: 114.209850, elevation:  49 , abbr: 'SHH' },
+    { id: 'postgrad-hall-1'           , name: "Postgraduate Hall 1"                  , nameZh: "賽馬會研究生宿舍一座", lat: 22.420248, lng: 114.212171, elevation:  32 , abbr: 'PG1' },
+    { id: 'campus-circuit-east-up'    , name: "Campus Circuit East (Upward)"         , nameZh: "環迴東路（上行）", lat: 22.421533, lng: 114.211835, elevation:  55 , abbr: 'CCE↑' },  // APPROXIMATE — road-side stop, position not in OSM
+    { id: 'campus-circuit-east-down'  , name: "Campus Circuit East (Downward)"       , nameZh: "環迴東路（下行）", lat: 22.421533, lng: 114.211835, elevation:  55 , abbr: 'CCE↓' },  // APPROXIMATE — road-side stop, position not in OSM
+    { id: 'campus-circuit-north-down' , name: "Campus Circuit North (Downward)"      , nameZh: "環迴北路（下行）", lat: 22.424445, lng: 114.209261, elevation:  11 , abbr: 'CCN↓' },  // APPROXIMATE — road-side stop, position not in OSM
+    { id: 'sir-run-run-shaw-hall'     , name: "Sir Run Run Shaw Hall"                , nameZh: "邵逸夫堂", lat: 22.419841, lng: 114.206942, elevation: 102 , abbr: 'SRS' },
+    { id: 'science-centre'            , name: "Science Centre"                       , nameZh: "科學館", lat: 22.419830, lng: 114.207342, elevation: 102 , abbr: 'SCI' },
+    { id: 'fung-king-hey'             , name: "Fung King Hey Building"               , nameZh: "馮景禧樓", lat: 22.419864, lng: 114.203032, elevation: 113 , abbr: 'FKH' },
+    { id: 'univ-admin'                , name: "University Administration Building"   , nameZh: "大學行政樓", lat: 22.418806, lng: 114.205358, elevation: 100 , abbr: 'ADM' },
+    { id: 'united-college-up'         , name: "United College (Upward)"              , nameZh: "聯合書院（上行）", lat: 22.420390, lng: 114.205394, elevation: 136 , abbr: 'UC↑' },
+    { id: 'united-college-down'       , name: "United College (Downward)"            , nameZh: "聯合書院（下行）", lat: 22.420302, lng: 114.205340, elevation: 133 , abbr: 'UC↓' },
+    { id: 'new-asia-college'          , name: "New Asia College"                     , nameZh: "新亞書院", lat: 22.421271, lng: 114.207559, elevation: 142 , abbr: 'NA' },
+    { id: 'new-asia-circle'           , name: "New Asia Circle"                      , nameZh: "新亞坊", lat: 22.421072, lng: 114.207647, elevation: 141 , abbr: 'NAC' },
+    { id: 'wu-yee-sun-up'             , name: "Wu Yee Sun College (Upward)"          , nameZh: "伍宜孫書院（上行）", lat: 22.421331, lng: 114.203471, elevation: 114 , abbr: 'WYS↑' },
+    { id: 'wu-yee-sun-down'           , name: "Wu Yee Sun College (Downward)"        , nameZh: "伍宜孫書院（下行）", lat: 22.421199, lng: 114.203521, elevation: 116 , abbr: 'WYS↓' },
+    { id: 'chan-chun-ha'              , name: "Chan Chun Ha Hostel"                  , nameZh: "陳震夏宿舍", lat: 22.421812, lng: 114.204612, elevation: 119 , abbr: 'CCH' },
+    { id: 'shaw-college-up'           , name: "Shaw College (Upward)"                , nameZh: "逸夫書院（上行）", lat: 22.422486, lng: 114.201315, elevation:  82 , abbr: 'SHW↑' },  // up/down stops share one mapped position
+    { id: 'shaw-college-down'         , name: "Shaw College (Downward)"              , nameZh: "逸夫書院（下行）", lat: 22.422486, lng: 114.201315, elevation:  82 , abbr: 'SHW↓' },  // up/down stops share one mapped position
+    { id: 'uc-staff-residence'        , name: "United College Staff Residence"       , nameZh: "聯合苑", lat: 22.423259, lng: 114.205130, elevation:  83 , abbr: 'UCS' },
+    { id: 'residence-15'              , name: "Residence No. 15"                     , nameZh: "十五苑", lat: 22.423716, lng: 114.206598, elevation:  62 , abbr: 'R15' },
+    { id: 'cw-chu-up'                 , name: "C.W. Chu College (Upward)"            , nameZh: "敬文書院（上行）", lat: 22.425557, lng: 114.206218, elevation:  23 , abbr: 'CWC↑' },  // up/down stops share one mapped position
+    { id: 'cw-chu-down'               , name: "C.W. Chu College (Downward)"          , nameZh: "敬文書院（下行）", lat: 22.425557, lng: 114.206218, elevation:  23 , abbr: 'CWC↓' },  // up/down stops share one mapped position
+    { id: 'area-39-up'                , name: "Area 39 (Upward)"                     , nameZh: "三十九區（上行）", lat: 22.427631, lng: 114.204351, elevation:   9 , abbr: 'A39↑' },  // up/down stops share one mapped position
+    { id: 'area-39-down'              , name: "Area 39 (Downward)"                   , nameZh: "三十九區（下行）", lat: 22.427631, lng: 114.204351, elevation:   9 , abbr: 'A39↓' },  // up/down stops share one mapped position
   ];
 
   // -------------------------------------------------------------------------
@@ -273,15 +277,54 @@
   });
 
   // -------------------------------------------------------------------------
+  // STOP ALIASES — what people actually call the shuttle stops.
+  //
+  // The official names come from the Transport Office and OpenStreetMap, and
+  // nobody says "University Station Piazza". Everyone says "MTR".
+  // -------------------------------------------------------------------------
+  var stopAliases = {
+    'univ-station':              ['MTR', 'MTR Station', 'University MTR Station', 'Uni Station', 'KCR', 'train station', '港鐵'],
+    'station-piazza':            ['Piazza', 'MTR Piazza', 'Station Plaza', 'bus terminus'],
+    'chung-chi-teaching':        ['Chung Chi Teaching', 'CC Teaching', 'Teaching Blocks'],
+    'yiap':                      ['YIA', 'YIAP', 'Yasumoto'],
+    'univ-sports-centre':        ['Sports Centre', 'Gym', 'USC', 'sports hall'],
+    'sh-ho-college':             ['SH Ho', 'Ho College', 'SHHO'],
+    'postgrad-hall-1':           ['PGH', 'PG Hall', 'Postgraduate Hall', 'Jockey Club Hall'],
+    'campus-circuit-east-up':    ['CCE', 'Campus Circuit East'],
+    'campus-circuit-east-down':  ['CCE', 'Campus Circuit East'],
+    'campus-circuit-north-down': ['CCN', 'Campus Circuit North'],
+    'sir-run-run-shaw-hall':     ['Shaw Hall', 'SRRS', 'SRRSH', 'Run Run Shaw'],
+    'science-centre':            ['Sci Centre', 'SC', 'Science'],
+    'fung-king-hey':             ['FKH', 'Fung King Hey', 'Business School'],
+    'univ-admin':                ['UAB', 'Admin', 'Admin Building', 'Administration'],
+    'united-college-up':         ['UC', 'United', 'United College'],
+    'united-college-down':       ['UC', 'United', 'United College'],
+    'new-asia-college':          ['NA', 'New Asia'],
+    'new-asia-circle':           ['NA Circle', 'New Asia Circle'],
+    'wu-yee-sun-up':             ['WYS', 'Wu Yee Sun'],
+    'wu-yee-sun-down':           ['WYS', 'Wu Yee Sun'],
+    'chan-chun-ha':              ['CCH', 'Chan Chun Ha'],
+    'shaw-college-up':           ['Shaw', 'Shaw College'],
+    'shaw-college-down':         ['Shaw', 'Shaw College'],
+    'uc-staff-residence':        ['UC Staff', 'United College Staff'],
+    'residence-15':              ['Res 15', 'Residence 15'],
+    'cw-chu-up':                 ['CWC', 'Chu College', 'CW Chu'],
+    'cw-chu-down':               ['CWC', 'Chu College', 'CW Chu'],
+    'area-39-up':                ['Area 39', 'A39', '39'],
+    'area-39-down':              ['Area 39', 'A39', '39']
+  };
+
+  // -------------------------------------------------------------------------
   // PLACE ALIASES — hand-maintained, merged over the auto-extracted list.
   //
-  // OSM names are the official ones; students use shorthand. Add whatever you
-  // hear people actually say. Re-running scripts/extract-places.js never
-  // touches this block.
+  // OpenStreetMap carries the official names; students use shorthand. Add
+  // whatever you actually hear people say. Re-running
+  // scripts/extract-places.js never touches this block.
   //
   // Keys are ids from data/places.generated.js.
   // -------------------------------------------------------------------------
   var placeAliases = {
+    // --- colleges -------------------------------------------------------
     'united-college':                      ['UC', 'United'],
     'new-asia-college':                    ['NA', 'New Asia'],
     'chung-chi-college':                   ['CC', 'Chung Chi'],
@@ -291,9 +334,23 @@
     'sh-ho-college':                       ['SHHO', 'S.H. Ho'],
     'morningside-college':                 ['MC'],
     'c-w-chu-college':                     ['CWC', 'Chu College'],
+
+    // --- halls of residence ---------------------------------------------
+    // University Residence Nos. 3 is across the road from Wu Yee Sun College
+    // and is known to its residents as I House Block 6.
+    'university-residence-nos-3':          ['I House Block 6', 'IHouse Block 6', 'I-House Block 6',
+                                            'IH Block 6', 'Block 6', 'University Residence No. 3',
+                                            'University Residence Number 3', 'Res 3', 'Residence 3'],
+    'international-house-1':               ['IH1', 'I House 1', 'I-House 1'],
+    'international-house-2':               ['IH2', 'I House 2', 'I-House 2'],
+    'international-house-3':               ['IH3', 'I House 3', 'I-House 3'],
+    'chan-chun-ha-hostel':                 ['CCH'],
+    'adam-schall-residence':               ['Adam Schall'],
+
+    // --- teaching and admin ---------------------------------------------
     'university-library':                  ['UL', 'Main Library', 'Uni Library'],
     'university-science-centre':           ['Science Centre', 'SC'],
-    'yasumoto-international-academic-park': ['YIA', 'Yasumoto'],
+    'yasumoto-international-academic-park': ['YIA', 'YIAP', 'Yasumoto'],
     'benjamin-franklin-centre':            ['BFC', 'Benjamin Franklin'],
     'sir-run-run-shaw-hall':               ['Shaw Hall', 'SRRSH'],
     'university-administration-building':  ['UAB', 'Admin Building'],
@@ -305,8 +362,41 @@
     'cheng-ming-building':                 ['CMB'],
     'chien-mu-library':                    ["Ch'ien Mu", 'New Asia Library'],
     'fong-shu-chuen-building':             ['FSC'],
-    'chan-chun-ha-hostel':                 ['CCH']
+    'wu-ho-man-yuen-building':             ['WMY', 'Wu Ho Man Yuen'],
+    'academic-building-no1':               ['AB1', 'Academic Building 1'],
+    'academic-building-no2':               ['AB2', 'Academic Building 2'],
+    'cheng-yu-tung-building':              ['CYT', 'Business School'],
+    'leung-kau-kui-building':              ['LKK'],
+    'lee-shau-kee-building':               ['LSK'],
+    'li-dak-sum-building':                 ['LDS'],
+    'tin-ka-ping-building':                ['TKP'],
+    'william-mw-mong-engineering-building': ['Engineering', 'Mong Engineering'],
+    'ho-sin-hang-engineering-building':     ['HSH', 'Engineering'],
+
+    // --- services -------------------------------------------------------
+    'university-health-centre':            ['clinic', 'health centre', 'doctor', 'medical'],
+    'cuhk-medical-centre':                 ['hospital', 'CUHK Hospital'],
+    'sir-philip-haddon-cave-sports-field':  ['running track', 'athletics track', 'football pitch', 'sports field'],
+    'si-yuan-amphitheatre':                ['Si Yuan']
   };
+
+  // -------------------------------------------------------------------------
+  // EXTRA PLACES — searchable destinations OpenStreetMap does not have.
+  //
+  // The extracted list is good but not complete: campus gates, the post
+  // office and the swimming pool are all missing, for instance. Add them
+  // here rather than editing data/places.generated.js, which is overwritten
+  // every time the extractor runs.
+  //
+  // `elevation` is metres above sea level and is required — it drives the
+  // walking estimate. Read it off a nearby building in places.generated.js
+  // if you do not have a better source.
+  //
+  //   { id: 'main-gate', name: 'Main Gate', nameZh: '正門',
+  //     aliases: ['gate'], lat: 22.0000, lng: 114.0000, elevation: 0 }
+  // -------------------------------------------------------------------------
+  var extraPlaces = [
+  ];
 
   // -------------------------------------------------------------------------
   // Assembly. Shuttle stops are also valid destinations, so they get folded
@@ -334,6 +424,23 @@
     return String(s || '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '');
   }
 
+  /**
+   * Drop stop aliases that already appear in the stop's own name.
+   *
+   * "Wu Yee Sun" as an alias of the stop "Wu Yee Sun College (Upward)" adds
+   * nothing — the name already matches — but it does add an *exact alias*
+   * match, which outranks the prefix match on the actual college building. The
+   * result is that searching "wu yee sun" offers you a boarding stop instead
+   * of the college. Genuine shorthand like "WYS" survives; restatements of the
+   * name do not.
+   */
+  function usefulAliases(stop) {
+    var name = nameKey(stop.name);
+    return (stopAliases[stop.id] || []).filter(function (a) {
+      return name.indexOf(nameKey(a)) === -1;
+    });
+  }
+
   var byName = {};
   generated.forEach(function (p) {
     var k = nameKey(p.name);
@@ -344,16 +451,20 @@
   stops.forEach(function (s) {
     var match = byName[nameKey(s.name)];
     if (match) {
-      // Same place, already searchable — just record that a shuttle stops here.
+      // Same place, already searchable — record that a shuttle stops here and
+      // fold in the stop's own nicknames.
       match.stopId = s.id;
       match.source = 'osm+stop';
+      usefulAliases(s).forEach(function (a) {
+        if (match.aliases.indexOf(a) === -1) match.aliases.push(a);
+      });
       return;
     }
     extraStopPlaces.push({
       id: 'stop:' + s.id,
       name: s.name,
       nameZh: s.nameZh,
-      aliases: ['bus stop', 'shuttle stop'],
+      aliases: usefulAliases(s).concat(['bus stop', 'shuttle stop']),
       lat: s.lat,
       lng: s.lng,
       elevation: s.elevation,
@@ -374,7 +485,13 @@
     config: config,
     stops: stops,
     routes: routes,
-    places: generated.concat(extraStopPlaces),
+    places: generated.concat(extraStopPlaces).concat(extraPlaces.map(function (p) {
+      return {
+        id: p.id, name: p.name, nameZh: p.nameZh || null,
+        aliases: p.aliases || [], lat: p.lat, lng: p.lng,
+        elevation: p.elevation, source: 'manual', stopId: p.stopId || null
+      };
+    })),
     attribution: 'Stop and place data © OpenStreetMap contributors (ODbL). Elevations from SRTM via OpenTopoData. Timetable © The Chinese University of Hong Kong, Transport Office.'
   };
 

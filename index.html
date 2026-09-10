@@ -76,6 +76,30 @@
   </section>
 
   <!-- ------------------------------------------------------------------ -->
+  <!-- Network browser — every route and stop, for when you would rather   -->
+  <!-- pick the bus yourself than describe a journey.                      -->
+  <!-- ------------------------------------------------------------------ -->
+  <section class="network" aria-label="Browse all routes and stops">
+    <button id="network-toggle" class="network__toggle" type="button" aria-expanded="false"
+            aria-controls="network-panel">
+      <span class="network__toggle-icon" aria-hidden="true">🗺</span>
+      <span>
+        <strong>Browse all routes &amp; stops</strong>
+        <small>See where every shuttle goes, and which way round</small>
+      </span>
+      <span class="network__chev" aria-hidden="true">▾</span>
+    </button>
+
+    <div id="network-panel" class="network__panel" hidden>
+      <div id="network-chips" class="chips" role="group" aria-label="Choose a route"></div>
+      <div id="network-map" class="map map--network" role="img"
+           aria-label="Map of the shuttle network"></div>
+      <p id="network-summary" class="network__summary"></p>
+      <ol id="network-stops" class="stoplist"></ol>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------------ -->
   <!-- Results                                                            -->
   <!-- ------------------------------------------------------------------ -->
   <section id="results-section" aria-label="Your options" aria-live="polite">

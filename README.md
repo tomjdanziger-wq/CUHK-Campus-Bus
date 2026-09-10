@@ -308,6 +308,55 @@ none do.
 > 39 m, which would be a 27% grade in a straight line, and is really 506 m of
 > road. A tighter ratio rejects correct geometry.
 
+## Browsing the network
+
+The planner answers "how do I get from A to B". **Browse all routes & stops**
+answers the other question people actually have — *where do these buses go?* —
+which is what you want once you know the campus and would rather pick the route
+yourself.
+
+Pick a route and you get its line on the map in its own colour, its stops
+labelled with short codes, **arrows showing which way round it runs**, and the
+full stop sequence listed in travel order with service hours and departure
+minutes.
+
+Direction is the point. Nearly every CUHK route is a one-way loop, so boarding
+on the wrong side of the road can mean riding most of the campus to reach
+somewhere two minutes' walk away. That is also why the (Upward) and (Downward)
+stops of a pair are kept separate everywhere in this app, and why their short
+codes carry ↑ and ↓.
+
+Stop codes live in the `abbr` field of each stop in `data/shuttle-data.js`. On a
+campus-wide view the labels collapse to dots — twenty-nine of them at that zoom
+overlap into an unreadable pile — and reappear when you select a route or zoom in.
+
+## Searching
+
+Fuzzy matching runs over English names, Chinese names and hand-written aliases,
+with exact matches, prefixes, word-starts, initialisms and typos all scored
+differently.
+
+Three things live in `data/shuttle-data.js`:
+
+- **`stopAliases`** — what people actually call the stops. The Transport Office
+  calls it "University Station"; everybody says "MTR". Aliases are merged into
+  the stop's searchable entry, so "MTR", "KCR" and "train station" all land on
+  the right stop.
+- **`placeAliases`** — shorthand for buildings: `UC`, `YIA`, `WMY`, `AB1`,
+  `LSK`, `business school`, `clinic`, `running track`. Keyed by id from
+  `data/places.generated.js`, and merged over it at load time, so re-running the
+  extractor never clobbers them.
+- **`extraPlaces`** — destinations OpenStreetMap simply does not have. The
+  extract is good but not complete: campus gates, the post office and the
+  swimming pool are all missing. Add them here rather than editing
+  `places.generated.js`, which is overwritten on every extractor run.
+
+Search also matches word by word, which is what makes `residence 3` find
+*University Residence Nos. 3* rather than *University Residence No. 13*. Plain
+substring matching fails on both — "Nos." sits between the words — and then both
+fall through to fuzzy matching and tie. Matching word by word, `3` starts the
+word `3` but does not start `13`.
+
 ## Deliberately not built (v1)
 
 - Real-time tracking. There is no data source, and no amount of UI would make one up honestly.

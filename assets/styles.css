@@ -65,6 +65,16 @@
 
 * { box-sizing: border-box; }
 
+.icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 1.25em;
+  height: 1.25em;
+  line-height: 0;
+}
+.icon svg { width: 100%; height: 100%; fill: currentColor; }
+.icon--mode { width: 26px; height: 26px; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
@@ -106,16 +116,6 @@ body {
 }
 .header__sub { margin: 6px 0 0; color: var(--ink-3); font-size: 15.5px; }
 
-/* A thin band of the route colours, as a masthead. Purely decorative, but it
-   ties the app to the palette the map uses. */
-body::before {
-  content: '';
-  display: block;
-  height: 4px;
-  background: linear-gradient(90deg,
-    #d1495b 0%, #e07a1f 16%, #00857a 33%,
-    #0b6e99 50%, #4ea3d1 66%, #7b52ab 83%, #b5179e 100%);
-}
 
 /* --- trip inputs -------------------------------------------------------- */
 
@@ -168,11 +168,14 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+.icon-btn svg { width: 22px; height: 22px; fill: currentColor; }
+
 .icon-btn {
   min-width: var(--tap);
   min-height: var(--tap);
-  font-size: 22px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: #fff;
   background: var(--bus);
   border: none;
@@ -194,7 +197,10 @@ button:focus-visible {
 .field__status--err { color: var(--danger); font-weight: 600; }
 
 .swap {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   width: 100%;
   min-height: 44px;
   font: inherit;
@@ -207,6 +213,7 @@ button:focus-visible {
   cursor: pointer;
 }
 .swap:active { background: var(--line); }
+.swap svg { width: 18px; height: 18px; fill: currentColor; }
 
 /* --- autocomplete ------------------------------------------------------- */
 
@@ -353,135 +360,196 @@ button:focus-visible {
 
 /* --- option cards ------------------------------------------------------- */
 
-#options { margin-top: 20px; display: flex; flex-direction: column; gap: 14px; }
+#options { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
 
 .opt {
+  position: relative;
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
-/* A stripe in the route's own colour, so a card matches its line on the map. */
-.opt--bus  { border-top: 4px solid var(--route-colour, var(--bus)); }
-.opt--walk { border-top: 4px solid var(--walk); }
+/* A stripe down the edge in the route's own colour, so a card is tied to its
+   line on the map without tinting the whole header. A grouped option blends
+   the colours of the routes it covers rather than picking one. */
+.opt::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--route-stripe, var(--route-colour, var(--line-strong)));
+}
+.opt--walk::before { background: var(--walk); }
 
 .opt__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  padding: 15px 15px 13px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  padding: 16px 16px 12px 19px;
 }
-.opt--bus .opt__head  { background: var(--bus-bg); }
-.opt--walk .opt__head { background: var(--walk-bg); }
-
-.opt__icon { font-size: 26px; line-height: 1.1; }
+.opt--bus .opt__icon,
+.opt--bus .icon--mode  { color: var(--route-colour, var(--bus)); }
+.opt--walk .icon--mode { color: var(--walk); }
 
 .opt__titles { flex: 1; min-width: 0; }
 .opt__mode {
   margin: 0;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
-.opt--bus .opt__mode  { color: var(--route-colour, var(--bus)); }
-.opt--walk .opt__mode { color: var(--walk); }
-.opt__mode-zh { font-size: 16px; font-weight: 600; color: var(--ink-3); }
+.opt__mode-sub {
+  display: block;
+  margin-top: 1px;
+  font-size: 14px;
+  color: var(--ink-3);
+}
 
-.opt__time {
-  text-align: right;
-  flex-shrink: 0;
+.opt__time { text-align: right; flex-shrink: 0; }
+.opt__time-range {
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
-.opt__time-range { display: block; font-size: 22px; font-weight: 800; white-space: nowrap; }
-.opt__time-unit  { display: block; font-size: 13px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
-.opt__arrive     { display: block; font-size: 14px; color: var(--ink-3); white-space: nowrap; }
+.opt__time-unit { font-size: 14px; color: var(--ink-3); margin-left: 3px; }
+.opt__arrive {
+  display: block;
+  margin-top: 1px;
+  font-size: 13px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
 /* The single most important line on the screen: which stop to stand at. */
 .board {
-  padding: 15px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
+  padding: 0 16px 14px 19px;
 }
 .board__label {
-  margin: 0 0 4px;
-  font-size: 13px;
+  margin: 0 0 2px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   color: var(--ink-3);
 }
 .board__name {
   margin: 0;
-  font-size: 21px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 700;
   line-height: 1.25;
+  letter-spacing: -0.02em;
 }
-.board__zh { display: block; font-size: 17px; font-weight: 600; color: var(--ink-2); }
-.board__walk { margin: 6px 0 0; font-size: 15px; color: var(--ink-2); }
+.board__zh { display: block; font-size: 16px; font-weight: 500; color: var(--ink-2); }
+.board__walk { margin: 5px 0 0; font-size: 14.5px; color: var(--ink-3); }
 
-.opt__body { padding: 4px 14px 14px; }
+.opt__body { padding: 0 16px 14px 19px; }
+.opt--walk .opt__body { padding-top: 2px; }
 
 /* --- leg breakdown ------------------------------------------------------ */
 
-.legs { list-style: none; margin: 10px 0 0; padding: 0; }
+.legs {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+}
 .legs li {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 9px 0;
-  border-bottom: 1px dashed var(--line);
-  font-size: 16px;
+  padding: 5px 0;
+  font-size: 15.5px;
 }
-.legs li:last-child { border-bottom: none; }
-.leg__icon { width: 1.4em; flex-shrink: 0; font-size: 17px; }
+.leg__icon { color: var(--ink-3); align-self: center; }
 .leg__text { flex: 1; min-width: 0; }
-.leg__sub  { display: block; font-size: 14px; color: var(--ink-3); }
-.leg__time { flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.leg__label { font-weight: 600; }
+.leg__sub {
+  display: block;
+  font-size: 13.5px;
+  color: var(--ink-3);
+  font-weight: 400;
+}
+.leg__time {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .legs li.leg--wait .leg__time { color: var(--warn); }
 
 /* --- departures --------------------------------------------------------- */
 
-.deps { margin: 12px 0 0; font-size: 15px; color: var(--ink-2); }
-.deps__label { font-weight: 700; color: var(--ink-3); text-transform: uppercase; font-size: 13px; letter-spacing: 0.06em; }
-.deps__times { font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 600; color: var(--ink); }
+.deps { margin: 12px 0 0; }
+.deps__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-3);
+  margin-bottom: 3px;
+}
+.deps__times {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.deps__time {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.deps__time--tagged {
+  border-bottom: 2px solid var(--route-colour, transparent);
+  padding-bottom: 1px;
+}
+.deps__sep { color: var(--line-strong); }
 
 /* --- flags -------------------------------------------------------------- */
 
 .flag {
   display: flex;
+  align-items: flex-start;
   gap: 8px;
-  margin: 12px 0 0;
-  padding: 10px 12px;
-  font-size: 15px;
-  line-height: 1.4;
-  border-radius: 8px;
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  border-radius: 9px;
 }
+.flag .icon { margin-top: 1px; }
 .flag--warn  { background: var(--warn-bg);  color: var(--warn); }
-.flag--info  { background: var(--surface);  color: var(--ink-2); border: 1px solid var(--line); }
 .flag--climb { background: var(--warn-bg);  color: var(--warn); }
-.flag strong { font-weight: 800; }
+.flag--info  { background: var(--surface);  color: var(--ink-2); }
 
 .pick {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   width: 100%;
   min-height: 44px;
-  margin-top: 12px;
+  margin-top: 14px;
   font: inherit;
   font-size: 15px;
   font-weight: 600;
   color: var(--ink-2);
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
 }
 .pick[aria-pressed="true"] {
   background: var(--route-colour, var(--bus));
   color: #fff;
-  border-color: var(--route-colour, var(--bus));
+  border-color: transparent;
 }
 
 /* --- map ---------------------------------------------------------------- */
@@ -598,11 +666,11 @@ button:focus-visible {
 }
 .network__toggle:active { background: var(--surface-2); }
 .network__toggle.is-open { border-color: var(--line-strong); border-radius: var(--radius) var(--radius) 0 0; }
-.network__toggle-icon { font-size: 24px; line-height: 1; }
+.network__toggle-icon { width: 24px; height: 24px; flex-shrink: 0; fill: var(--ink-3); }
 .network__toggle strong { display: block; font-size: 17px; }
 .network__toggle small { display: block; font-size: 14px; color: var(--ink-3); margin-top: 2px; }
 .network__toggle > span:nth-child(2) { flex: 1; min-width: 0; }
-.network__chev { font-size: 18px; color: var(--ink-3); transition: transform .18s ease; }
+.network__chev { width: 20px; height: 20px; flex-shrink: 0; fill: var(--ink-3); transition: transform .18s ease; }
 .network__toggle.is-open .network__chev { transform: rotate(180deg); }
 
 .network__panel {
@@ -707,13 +775,13 @@ button:focus-visible {
   box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
 }
 
-.arrowmark__glyph {
+.arrowmark__svg {
   display: block;
-  font-size: 15px;
-  line-height: 1;
+  width: 15px;
+  height: 15px;
+  margin: -7.5px 0 0 -7.5px;
   transform-origin: 50% 50%;
-  text-shadow: 0 0 3px #fff, 0 0 3px #fff;
-  margin: -8px 0 0 -8px;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, .35));
 }
 
 /* Collapse stop labels to dots when the view is too busy to read them.

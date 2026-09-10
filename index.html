@@ -24,7 +24,7 @@
 
 <header class="header">
   <h1>Walk or shuttle?</h1>
-  <p class="header__sub">Every time below is an estimate. You decide.</p>
+  <p class="header__sub">Times are estimates. You decide.</p>
 </header>
 
 <main class="wrap">
@@ -42,7 +42,9 @@
                aria-describedby="origin-status" aria-autocomplete="list" role="combobox"
                aria-expanded="false" aria-controls="origin-results">
         <button id="gps-btn" class="icon-btn" type="button" title="Use my location"
-                aria-label="Use my current location">◎</button>
+                aria-label="Use my current location">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A9 9 0 0 0 13 3.06V1h-2v2.06A9 9 0 0 0 3.06 11H1v2h2.06A9 9 0 0 0 11 20.94V23h2v-2.06A9 9 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/></svg>
+        </button>
       </div>
       <ul id="origin-results" class="results" role="listbox" hidden></ul>
       <p id="origin-status" class="field__status" role="status"></p>
@@ -53,7 +55,8 @@
     </div>
 
     <button id="swap-btn" class="swap" type="button" aria-label="Swap origin and destination">
-      <span aria-hidden="true">⇅</span> Swap
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>
+      <span>Swap</span>
     </button>
 
     <div class="field">
@@ -82,12 +85,12 @@
   <section class="network" aria-label="Browse all routes and stops">
     <button id="network-toggle" class="network__toggle" type="button" aria-expanded="false"
             aria-controls="network-panel">
-      <span class="network__toggle-icon" aria-hidden="true">🗺</span>
+      <svg class="network__toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
       <span>
-        <strong>Browse all routes &amp; stops</strong>
-        <small>See where every shuttle goes, and which way round</small>
+        <strong>All routes &amp; stops</strong>
+        <small>Where each shuttle goes, and which way round</small>
       </span>
-      <span class="network__chev" aria-hidden="true">▾</span>
+      <svg class="network__chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
     </button>
 
     <div id="network-panel" class="network__panel" hidden>
@@ -104,8 +107,8 @@
   <!-- ------------------------------------------------------------------ -->
   <section id="results-section" aria-label="Your options" aria-live="polite">
     <div id="empty-state" class="empty">
-      <p>Pick where you're going.</p>
-      <p class="empty__hint">Walking is always shown as an option, even when it's slower.</p>
+      <p>Where are you going?</p>
+      <p class="empty__hint">Walking is always shown, even when it's slower.</p>
     </div>
     <div id="options"></div>
   </section>
@@ -128,9 +131,10 @@
   <footer class="footer">
     <p id="validity" class="footer__validity"></p>
     <p class="footer__note">
-      No live tracking. All departure times are <strong>scheduled</strong> times, and
-      buses run late. Walking times assume an unhurried pace and are adjusted for
-      the hills, not for stairs, crowds or rain.
+      No live tracking. Every departure shown is a <strong>scheduled</strong> time, and
+      buses run late. Waits are the real gap to the next departure, not an average.
+      Walking times assume an unhurried pace and account for the hills, but not for
+      stairs, crowds or rain.
     </p>
     <p id="attribution" class="footer__attr"></p>
   </footer>

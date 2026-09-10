@@ -229,11 +229,19 @@ It deliberately does **not** assume the nearest stop is the right stop. Sometime
 
 ### Which options get shown
 
-1. **Dominance.** An option must save at least `minWalkSavedMinutes` (3) of *walking* versus going on foot the whole way. This kills suggestions like "walk 5 minutes to a stop and 14 minutes from the next one" to avoid a 17-minute walk. The filter is about walking, not total time — a bus that merely ties with walking still saves you the climb and stays on the list.
-2. **Sanity cap.** Options losing to the walk by more than `maxWorseThanWalkMinutes` (15) are dropped. A 58-minute wait next to an 8-minute stroll is honest and useless.
-3. **One per route.** Two ways to catch the same bus is noise.
-4. **The 8-minute rule.** A boarding stop further away than the nearest one is surfaced *only* when it beats the best nearby option by `furtherStopThresholdMinutes` (8) or more. Everything here carries roughly ±30% error; recommending a 6-minute uphill walk to save a predicted 3 minutes would often be wrong, and being wrong about that is worse than staying quiet. When it does fire, the card says how much further and how much sooner.
-5. **Ties break toward less walking.** At this granularity options tie constantly, and when two get you there at the same moment the one with less walking is simply better advice.
+1. **Grouping.** If several routes run the same stretch — same boarding stop,
+   same alighting stop, similar ride time — they collapse into one option
+   carrying all their departures. From the rider's side they are the same
+   journey: you walk to the stop and take whichever turns up. Shown as separate
+   cards they look like a decision, and they hide the thing that actually
+   matters, which is the combined frequency. A route that shares both endpoints
+   but loops the long way round exceeds `groupRideToleranceMinutes` (4) and
+   keeps its own card, because that is a genuinely different ride.
+2. **Dominance.** An option must save at least `minWalkSavedMinutes` (3) of *walking* versus going on foot the whole way. This kills suggestions like "walk 5 minutes to a stop and 14 minutes from the next one" to avoid a 17-minute walk. The filter is about walking, not total time — a bus that merely ties with walking still saves you the climb and stays on the list.
+3. **Sanity cap.** Options losing to the walk by more than `maxWorseThanWalkMinutes` (15) are dropped. A 58-minute wait next to an 8-minute stroll is honest and useless.
+4. **One per boarding stop.** Two ways to leave from the same place is noise.
+5. **The 8-minute rule.** A boarding stop further away than the nearest one is surfaced *only* when it beats the best nearby option by `furtherStopThresholdMinutes` (8) or more. Everything here carries roughly ±30% error; recommending a 6-minute uphill walk to save a predicted 3 minutes would often be wrong, and being wrong about that is worse than staying quiet. When it does fire, the card says how much further and how much sooner.
+6. **Ties break toward less walking.** At this granularity options tie constantly, and when two get you there at the same moment the one with less walking is simply better advice.
 
 The direct walk is added afterwards and is never filtered out.
 
@@ -287,6 +295,12 @@ is visible; the option you are looking at drawn on top in that route's own
 colour, for the ridden stretch only; your walking legs dashed in green on real
 footpaths. The basemap is desaturated so the route colours carry the meaning.
 Route colours live in `config.routeColours`.
+
+Direction is drawn as white chevrons sitting *on* the coloured line, the way
+transit maps do it, rather than glyphs floating beside it — which is why the
+active route is drawn heavier than the rest, to give them room. They appear only
+when a single route is selected: eight overlapping sets of arrows tell you
+nothing.
 
 The whole thing is 312 KB raw, 64 KB gzipped, and lazy-loaded: if Leaflet or the
 tiles fail, the map hides itself and every written instruction still works.

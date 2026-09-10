@@ -38,6 +38,38 @@
     netZoomBound: false
   };
 
+
+  // =========================================================================
+  // Icons
+  //
+  // Inline SVG rather than emoji. Emoji render differently on every platform,
+  // sit on the text baseline at the wrong size, and cannot take the colour of
+  // the thing they label — a bus icon should be the colour of its route.
+  // =========================================================================
+
+  var ICON_PATHS = {
+    walk:  'M13.5 5.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM9.8 8.9 7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3A7 7 0 0 0 19 13v-2a5 5 0 0 1-4.2-2.4l-1-1.6c-.4-.6-1-1-1.8-1-.3 0-.5 0-.8.2L6 8.3V13h2V9.6l1.8-.7z',
+    bus:   'M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM18 11H6V6h12v5z',
+    clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z',
+    pin:   'M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z',
+    alert: 'M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z',
+    info:  'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z',
+    hill:  'M14 6l-3.75 5 2.85 3.8-1.6 1.2C9.81 13.75 7 10 7 10l-6 8h22L14 6z',
+    trend: 'M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6h-6z',
+    map:   'M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z',
+    swap:  'M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z',
+    gps:   'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A9 9 0 0 0 13 3.06V1h-2v2.06A9 9 0 0 0 3.06 11H1v2h2.06A9 9 0 0 0 11 20.94V23h2v-2.06A9 9 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z'
+  };
+
+  function icon(name, className) {
+    var span = document.createElement('span');
+    span.className = 'icon' + (className ? ' ' + className : '');
+    span.setAttribute('aria-hidden', 'true');
+    span.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="' +
+                     ICON_PATHS[name] + '"/></svg>';
+    return span;
+  }
+
   // =========================================================================
   // Formatting
   //
@@ -371,156 +403,162 @@
     var card = el('div', 'opt opt--walk' + (o.isBest ? ' opt--best' : ''));
 
     var head = el('div', 'opt__head');
-    head.appendChild(el('span', 'opt__icon', '🚶'));
+    head.appendChild(icon('walk', 'icon--mode'));
 
     var titles = el('div', 'opt__titles');
-    titles.appendChild(el('h2', 'opt__mode', 'Walk the whole way'));
-    titles.appendChild(el('span', 'opt__mode-zh', '步行'));
+    titles.appendChild(el('h2', 'opt__mode', 'Walk'));
+    titles.appendChild(el('span', 'opt__mode-sub', describeWalk(o.walk)));
     head.appendChild(titles);
 
     var time = el('div', 'opt__time');
     time.appendChild(el('strong', 'opt__time-range', formatRange(o.totalLow, o.totalHigh)));
-    time.appendChild(el('span', 'opt__time-unit', 'minutes'));
+    time.appendChild(el('span', 'opt__time-unit', 'min'));
     time.appendChild(el('span', 'opt__arrive', o.arrivalLabel));
     head.appendChild(time);
     card.appendChild(head);
 
     var body = el('div', 'opt__body');
-    body.appendChild(el('p', 'board__walk', describeWalk(o.walk)));
 
     // The elevation note is not optional. A flat time estimate on this campus
     // is misleading — the same route is a different journey in each direction.
     if (o.walk.climb >= CFG.display.notableElevationMetres) {
-      var climb = el('p', 'flag flag--climb');
-      climb.appendChild(el('span', null, '⛰'));
-      climb.appendChild(el('span', null,
-        'That climb is the part the clock does not show. Expect it to feel ' +
-        'longer than the number suggests, especially in the heat.'));
-      body.appendChild(climb);
+      body.appendChild(flag('hill', 'flag--climb',
+        'The climb is the part the clock does not show.'));
     }
 
     body.appendChild(mapButton(o));
-
     card.appendChild(body);
     return card;
   }
 
+  /** "1, 2 or 4" — how someone would actually say it out loud. */
+  function joinList(items) {
+    if (items.length <= 1) return items.join('');
+    return items.slice(0, -1).join(', ') + ' or ' + items[items.length - 1];
+  }
+
+  function flag(iconName, className, text) {
+    var p = el('p', 'flag ' + className);
+    p.appendChild(icon(iconName));
+    p.appendChild(el('span', null, text));
+    return p;
+  }
+
   function renderShuttleCard(o) {
+    var routes = o.routes || [o.route];
     var card = el('div', 'opt opt--bus' + (o.isBest ? ' opt--best' : ''));
     card.style.setProperty('--route-colour', o.route.colour);
 
-    // --- header: route and total time ---
+    // A grouped option carries several routes, so the edge stripe blends their
+    // colours rather than picking a winner among equals.
+    if (routes.length > 1) {
+      var stops = routes.map(function (r, i) {
+        return r.colour + ' ' + Math.round(i * 100 / routes.length) + '% ' +
+               Math.round((i + 1) * 100 / routes.length) + '%';
+      });
+      card.style.setProperty('--route-stripe', 'linear-gradient(180deg,' + stops.join(',') + ')');
+    }
+
+    // --- header ---
     var head = el('div', 'opt__head');
-    head.appendChild(el('span', 'opt__icon', '🚌'));
+    head.appendChild(icon('bus', 'icon--mode'));
 
     var titles = el('div', 'opt__titles');
     titles.appendChild(el('h2', 'opt__mode',
-      o.route.name + (o.route.label ? ' · ' + o.route.label : '')));
-    if (o.route.nameZh) titles.appendChild(el('span', 'opt__mode-zh', o.route.nameZh));
+      routes.length > 1 ? 'Route ' + joinList(routes.map(function (r) { return r.id; }))
+                        : o.route.name));
+    titles.appendChild(el('span', 'opt__mode-sub',
+      routes.length > 1
+        ? 'whichever comes first'
+        : (o.route.label || o.route.nameZh || '')));
     head.appendChild(titles);
 
     var time = el('div', 'opt__time');
     time.appendChild(el('strong', 'opt__time-range', formatRange(o.totalLow, o.totalHigh)));
-    time.appendChild(el('span', 'opt__time-unit', 'minutes'));
+    time.appendChild(el('span', 'opt__time-unit', 'min'));
     time.appendChild(el('span', 'opt__arrive', o.arrivalLabel));
     head.appendChild(time);
     card.appendChild(head);
 
     // --- the single most important field on the screen ---
-    // The most common failure for a new student is waiting at the wrong stop,
-    // so the boarding stop gets its own block, the largest type on the card
-    // after the total, and both languages.
+    // The most common failure for a new student is waiting at the wrong stop.
     var board = el('div', 'board');
     board.appendChild(el('p', 'board__label', 'Board at'));
     var name = el('p', 'board__name', o.boardStop.name);
     if (o.boardStop.nameZh) name.appendChild(el('span', 'board__zh', o.boardStop.nameZh));
     board.appendChild(name);
-    // Don't say "~1 min walk · you are basically there already" — pick one.
     board.appendChild(el('p', 'board__walk',
       o.walkToStop.metres < 30
-        ? 'You are already at this stop.'
-        : formatLeg(o.walkToStop.minutes) + ' walk from here · ' + describeWalk(o.walkToStop)));
+        ? "You're already here."
+        : formatLeg(o.walkToStop.minutes) + ' walk · ' + describeWalk(o.walkToStop)));
     card.appendChild(board);
 
     var body = el('div', 'opt__body');
 
-    // --- "walk further for a better bus" ---
     if (o.worthTheExtraWalk) {
       var w = o.worthTheExtraWalk;
-      var flag = el('p', 'flag flag--warn');
-      flag.appendChild(el('span', null, '↗'));
-      var txt = el('span');
-      txt.appendChild(el('strong', null, 'Worth the extra walk. '));
-      txt.appendChild(document.createTextNode(
-        'This stop is about ' + Math.round(w.extraWalkMinutes) + ' min further than ' +
-        w.insteadOf.name + ', but gets you there roughly ' +
-        Math.round(w.savingMinutes) + ' min sooner.'));
-      flag.appendChild(txt);
-      body.appendChild(flag);
+      body.appendChild(flag('trend', 'flag--warn',
+        'About ' + Math.round(w.extraWalkMinutes) + ' min further than ' +
+        w.insteadOf.name + ', but roughly ' + Math.round(w.savingMinutes) +
+        ' min sooner overall.'));
     }
 
-    // --- leg breakdown, deliberately NOT collapsed into one number ---
+    // --- legs, deliberately not collapsed into one number ---
     var legs = el('ul', 'legs');
 
-    legs.appendChild(o.walkToStop.metres < 30
-      ? legRow('📍', 'You are already at this stop', null, '—')
-      : legRow('🚶', 'Walk to ' + o.boardStop.name,
-               describeWalk(o.walkToStop), formatLeg(o.walkToStop.minutes)));
-
-    legs.appendChild(legRow('⏱', 'Wait for the ' + o.departureTime,
-      'scheduled departure — the real gap, not an average',
+    legs.appendChild(legRow('clock', 'Wait',
+      'next ' + o.departureTime + (routes.length > 1 ? ' · Route ' + o.route.id : ''),
       formatWait(o.waitMinutes), 'leg--wait'));
 
-    legs.appendChild(legRow('🚌', 'Ride to ' + o.alightStop.name,
-      (o.alightStop.nameZh ? o.alightStop.nameZh + ' · ' : '') +
-      (o.rideIsEstimated ? 'ride time estimated from distance' : 'scheduled running time'),
-      '~' + Math.round(o.rideMinutes) + ' min'));
+    legs.appendChild(legRow('bus', 'Ride',
+      'to ' + o.alightStop.name +
+      (o.rideIsEstimated ? ' · time estimated' : ''),
+      o.rideMinutesHigh && o.rideMinutesHigh - o.rideMinutesLow >= 1
+        ? '~' + Math.round(o.rideMinutesLow) + '–' + Math.round(o.rideMinutesHigh) + ' min'
+        : '~' + Math.round(o.rideMinutes) + ' min'));
 
-    legs.appendChild(o.walkFromStop.metres < 30
-      ? legRow('📍', 'The stop is your destination', null, '—')
-      : legRow('🚶', 'Walk to your destination',
-               describeWalk(o.walkFromStop), formatLeg(o.walkFromStop.minutes)));
-
+    if (o.walkFromStop.metres >= 30) {
+      legs.appendChild(legRow('walk', 'Walk',
+        describeWalk(o.walkFromStop), formatLeg(o.walkFromStop.minutes)));
+    }
     body.appendChild(legs);
 
-    // --- upcoming departures ---
+    // --- departures ---
     var deps = el('p', 'deps');
-    deps.appendChild(el('span', 'deps__label', 'Next scheduled from this stop: '));
-    deps.appendChild(el('span', 'deps__times', o.upcomingDepartures.join('  ·  ')));
+    deps.appendChild(el('span', 'deps__label', 'Next from this stop'));
+    var times = el('span', 'deps__times');
+    if (o.pooledDepartures) {
+      // Only underline in route colours when several routes are pooled here —
+      // otherwise it is decoration that looks like it means something.
+      o.pooledDepartures.forEach(function (d, i) {
+        if (i) times.appendChild(el('span', 'deps__sep', '·'));
+        var t = el('span', 'deps__time deps__time--tagged', d.time);
+        t.style.setProperty('--route-colour', d.route.colour);
+        t.title = d.route.name;
+        times.appendChild(t);
+      });
+    } else {
+      o.upcomingDepartures.forEach(function (t, i) {
+        if (i) times.appendChild(el('span', 'deps__sep', '·'));
+        times.appendChild(el('span', 'deps__time', t));
+      });
+    }
+    deps.appendChild(times);
     body.appendChild(deps);
 
-    // --- tight connection ---
     if (o.isTight) {
-      var tight = el('p', 'flag flag--warn');
-      tight.appendChild(el('span', null, '⏳'));
-      var tt = el('span');
-      tt.appendChild(el('strong', null, 'Tight. '));
-      tt.appendChild(document.createTextNode(
-        'If the walk takes you longer than estimated you may watch this one leave' +
-        (o.fallbackDeparture
-          ? '. The one after is scheduled for ' + o.fallbackDeparture + '.'
-          : ', and it is the last one in the next hour.')));
-      tight.appendChild(tt);
-      body.appendChild(tight);
+      body.appendChild(flag('clock', 'flag--warn',
+        'Tight — if the walk runs long you may miss it' +
+        (o.fallbackDeparture ? '. Next is ' + o.fallbackDeparture + '.' : '.')));
     }
 
-    // --- capacity warning: static, we have no occupancy data ---
-    if (o.capacityWarning) {
-      var cap = el('p', 'flag flag--warn');
-      cap.appendChild(el('span', null, '⚠'));
-      cap.appendChild(el('span', null, o.capacityWarning));
-      body.appendChild(cap);
-    }
+    if (o.capacityWarning) body.appendChild(flag('alert', 'flag--warn', o.capacityWarning));
 
-    if (o.route.notes) {
-      var note = el('p', 'flag flag--info');
-      note.appendChild(el('span', null, 'ℹ'));
-      note.appendChild(el('span', null, o.route.notes));
-      body.appendChild(note);
-    }
+    (o.notes || (o.route.notes ? [o.route.notes] : [])).forEach(function (n) {
+      body.appendChild(flag('info', 'flag--info', n));
+    });
 
     body.appendChild(mapButton(o));
-
     card.appendChild(body);
     return card;
   }
@@ -530,10 +568,12 @@
    * commitment, and nothing is ever pre-selected on the user's behalf.
    */
   function mapButton(o) {
-    var pick = el('button', 'pick', 'Show this on the map');
+    var pick = el('button', 'pick');
     pick.type = 'button';
+    pick.appendChild(icon('map'));
+    pick.appendChild(el('span', null,
+      state.selectedKey === o.key ? 'Showing on map' : 'Show on map'));
     pick.setAttribute('aria-pressed', String(state.selectedKey === o.key));
-    if (state.selectedKey === o.key) pick.textContent = 'Shown on the map below';
     pick.addEventListener('click', function () {
       state.selectedKey = state.selectedKey === o.key ? null : o.key;
       render();
@@ -542,11 +582,11 @@
     return pick;
   }
 
-  function legRow(icon, main, sub, timeText, extraClass) {
+  function legRow(iconName, main, sub, timeText, extraClass) {
     var li = el('li', extraClass || null);
-    li.appendChild(el('span', 'leg__icon', icon));
+    li.appendChild(icon(iconName, 'leg__icon'));
     var text = el('div', 'leg__text');
-    text.appendChild(document.createTextNode(main));
+    text.appendChild(el('span', 'leg__label', main));
     if (sub) text.appendChild(el('span', 'leg__sub', sub));
     li.appendChild(text);
     li.appendChild(el('span', 'leg__time', timeText));
@@ -670,12 +710,13 @@
         var ridden = riddenShape(option);
         if (ridden.length > 1) {
           // A white casing underneath makes the colour legible over any tile.
-          L.polyline(ridden, { color: '#ffffff', weight: 11, opacity: 0.9 })
+          L.polyline(ridden, { color: '#ffffff', weight: 12, opacity: 0.9 })
             .addTo(state.activeLayer);
           L.polyline(ridden, {
-            color: option.route.colour, weight: 6, opacity: 1, lineJoin: 'round'
+            color: option.route.colour, weight: 7, opacity: 1, lineJoin: 'round'
           }).addTo(state.activeLayer).bindPopup(
             option.route.name + (option.route.label ? ' · ' + option.route.label : ''));
+          drawDirectionArrows(L, ridden, state.activeLayer, 180);
           add(ridden);
         }
       }
@@ -920,12 +961,12 @@
 
         var active = !only || only === route.id;
         if (active) {
-          L.polyline(shape.line, { color: '#fff', weight: 9, opacity: 0.85 })
+          L.polyline(shape.line, { color: '#fff', weight: 11, opacity: 0.9 })
             .addTo(state.netLayer);
         }
         L.polyline(shape.line, {
           color: route.colour,
-          weight: active ? 5 : 2.5,
+          weight: active ? 7 : 2.5,
           opacity: active ? 0.95 : 0.16,
           lineJoin: 'round'
         }).addTo(state.netLayer).bindPopup(
@@ -935,7 +976,7 @@
         if (active) {
           // Direction arrows only when one route is selected. Eight sets of
           // arrows overlapping each other tells you nothing.
-          if (only) drawDirectionArrows(L, shape.line, route.colour);
+          if (only) drawDirectionArrows(L, shape.line, state.netLayer);
           shape.line.forEach(function (pt) { bounds.push(pt); });
         }
       });
@@ -972,17 +1013,18 @@
       // Twenty-nine labelled pills on a campus-wide view overlap into an
       // unreadable pile, so they collapse to dots until there is room: either
       // a single route is selected, or the user has zoomed in.
-      function syncLabels() {
-        var roomy = !!only || map.getZoom() >= 16;
-        container.classList.toggle('labels-off', !roomy);
-      }
+      //
+      // This reads state.netRoute rather than the `only` local on purpose. The
+      // zoomend handler is bound once, so a closure over `only` would freeze
+      // whatever was selected the first time the map opened — and fitBounds
+      // fires zoomend, which promptly undid the correct value.
       if (!state.netZoomBound) {
-        map.on('zoomend', syncLabels);
+        map.on('zoomend', syncNetworkLabels);
         state.netZoomBound = true;
       }
-      syncLabels();
+      syncNetworkLabels();
 
-      setTimeout(function () { map.invalidateSize(); syncLabels(); }, 0);
+      setTimeout(function () { map.invalidateSize(); syncNetworkLabels(); }, 0);
 
     }).catch(function () {
       container.innerHTML =
@@ -992,30 +1034,46 @@
     renderNetworkList();
   }
 
+  function syncNetworkLabels() {
+    var container = $('network-map');
+    if (!state.netMap) return;
+    var roomy = !!state.netRoute || state.netMap.getZoom() >= 16;
+    container.classList.toggle('labels-off', !roomy);
+  }
+
   /**
-   * Arrows along a route line. These carry real information: nearly every
-   * route here is a one-way loop, so "which way does it go round" decides
-   * whether the bus is a five-minute ride or a twenty-minute one.
+   * Direction arrows along a route line.
+   *
+   * These carry real information: nearly every route here is a one-way loop,
+   * so which way it goes round decides whether the bus is a five-minute ride
+   * or a twenty-minute one.
+   *
+   * Drawn as white chevrons sitting *on* the coloured line, the way transit
+   * maps do it, rather than glyphs floating beside it. The line has to be
+   * thick enough to hold them, which is why the active route is drawn heavier.
    */
-  function drawDirectionArrows(L, line, colour) {
+  function drawDirectionArrows(L, line, layer, spacing) {
     var carried = 0;
     for (var i = 0; i < line.length - 1; i++) {
       var seg = metresBetween(line[i], line[i + 1]);
       carried += seg;
-      if (carried < ARROW_SPACING_M || seg < 1) continue;
+      if (carried < (spacing || ARROW_SPACING_M) || seg < 1) continue;
       carried = 0;
 
-      var angle = bearing(line[i], line[i + 1]);
+      // A bearing of 0 is north; the chevron is drawn pointing east.
+      var angle = bearing(line[i], line[i + 1]) - 90;
       L.marker(line[i + 1], {
         interactive: false,
         keyboard: false,
         icon: L.divIcon({
           className: 'arrowmark',
-          html: '<span class="arrowmark__glyph" style="transform:rotate(' +
-                (angle - 90) + 'deg);color:' + colour + '">➤</span>',
+          html: '<svg class="arrowmark__svg" viewBox="0 0 16 16" ' +
+                'style="transform:rotate(' + angle + 'deg)">' +
+                '<path d="M5.5 3.4 L10.1 8 L5.5 12.6" fill="none" stroke="#fff" ' +
+                'stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
           iconSize: null
         })
-      }).addTo(state.netLayer);
+      }).addTo(layer);
     }
   }
 

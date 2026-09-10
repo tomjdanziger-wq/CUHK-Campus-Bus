@@ -131,6 +131,13 @@
       // you the climb.
       minWalkSavedMinutes: 3,
 
+      // Two routes running the same stretch are shown as one option when
+      // their ride times are within this of each other — you board whichever
+      // comes first, so presenting them separately fakes a decision and hides
+      // their combined frequency. A route sharing both endpoints but looping
+      // the long way round exceeds this and stays on its own card.
+      groupRideToleranceMinutes: 4,
+
       // Drop shuttle options that lose to the direct walk by more than this.
       // Generous on purpose — a bus that ties with walking still saves you the
       // climb and stays on the list. This only removes the absurd cases, like
@@ -258,10 +265,11 @@
     // '1': [2, 4, 2, 3, 2],
   };
 
-  var routes = (root.CUHK_ROUTES_GENERATED || []).map(function (r) {
+  var routes = (root.CUHK_ROUTES_GENERATED || []).map(function (r, i) {
     var seg = rideTimes[r.id];
     return {
       id: r.id,
+      order: i,
       colour: config.routeColours[r.id] || config.fallbackRouteColour,
       name: r.name,
       nameZh: r.nameZh,

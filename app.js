@@ -427,6 +427,7 @@
     }
 
     body.appendChild(mapButton(o));
+    attachMapPanel(o, body);
     card.appendChild(body);
     return card;
   }
@@ -473,10 +474,12 @@
         : (o.route.label || o.route.nameZh || '')));
     head.appendChild(titles);
 
+    // The headline is time spent MOVING. The wait gets its own line below,
+    // because rolling it in would claim the bus takes as long as your bad
+    // luck with the timetable.
     var time = el('div', 'opt__time');
-    time.appendChild(el('strong', 'opt__time-range', formatRange(o.totalLow, o.totalHigh)));
-    time.appendChild(el('span', 'opt__time-unit', 'min'));
-    time.appendChild(el('span', 'opt__arrive', o.arrivalLabel));
+    time.appendChild(el('strong', 'opt__time-range', formatRange(o.travelLow, o.travelHigh)));
+    time.appendChild(el('span', 'opt__time-unit', 'min travel'));
     head.appendChild(time);
     card.appendChild(head);
 
@@ -503,12 +506,31 @@
         ' min sooner overall.'));
     }
 
-    // --- legs, deliberately not collapsed into one number ---
+    // --- the wait, on its own, in full ---
+    //
+    // Not folded into the headline and not buried in the leg list. If you have
+    // just watched a bus pull away, the gap to the next one is the single most
+    // important number on the screen, and it is the one an "average wait"
+    // would quietly lie about.
+    var waitRow = el('p', 'waitline');
+    waitRow.appendChild(icon('clock'));
+    var waitText = el('span', 'waitline__text');
+    waitText.appendChild(el('strong', null,
+      o.waitMinutes < 0.75 ? 'Leaving now' : 'Wait ' + Math.round(o.waitMinutes) + ' min'));
+    waitText.appendChild(document.createTextNode(
+      ' for the ' + o.departureTime +
+      (routes.length > 1 ? ' (Route ' + o.route.id + ')' : '')));
+    waitText.appendChild(el('span', 'waitline__arrive', o.arrivalLabel));
+    waitRow.appendChild(waitText);
+    body.appendChild(waitRow);
+
+    // --- the travel legs, deliberately not collapsed into one number ---
     var legs = el('ul', 'legs');
 
-    legs.appendChild(legRow('clock', 'Wait',
-      'next ' + o.departureTime + (routes.length > 1 ? ' · Route ' + o.route.id : ''),
-      formatWait(o.waitMinutes), 'leg--wait'));
+    if (o.walkToStop.metres >= 30) {
+      legs.appendChild(legRow('walk', 'Walk',
+        'to ' + o.boardStop.name, formatLeg(o.walkToStop.minutes)));
+    }
 
     legs.appendChild(legRow('bus', 'Ride',
       'to ' + o.alightStop.name +
@@ -546,6 +568,31 @@
     deps.appendChild(times);
     body.appendChild(deps);
 
+    // --- where the bus goes next ---
+    if (o.onwardStops && o.onwardStops.length) {
+      var onward = el('div', 'onward');
+      onward.appendChild(el('p', 'onward__label', 'Or stay on for'));
+      var list = el('ul', 'onward__list');
+      o.onwardStops.forEach(function (n) {
+        var li = el('li');
+        var nm = el('span', 'onward__stop', n.stop.name);
+        li.appendChild(nm);
+        li.appendChild(el('span', 'onward__walk',
+          n.walkMinutes == null ? '—'
+            : n.walkMetres < 30 ? 'you are there'
+            : 'then ' + Math.round(n.walkMinutes) + ' min walk'));
+        // Flag a later stop that leaves you meaningfully closer on foot. The
+        // ranking prefers arriving sooner; someone facing a climb in August
+        // may not.
+        if (n.walkMinutes != null && n.walkMinutes <= o.walkFromStop.minutes - 3) {
+          li.classList.add('onward__item--closer');
+        }
+        list.appendChild(li);
+      });
+      onward.appendChild(list);
+      body.appendChild(onward);
+    }
+
     if (o.isTight) {
       body.appendChild(flag('clock', 'flag--warn',
         'Tight — if the walk runs long you may miss it' +
@@ -559,8 +606,21 @@
     });
 
     body.appendChild(mapButton(o));
+    attachMapPanel(o, body);
     card.appendChild(body);
     return card;
+  }
+
+  /**
+   * Move the single map panel into the option being shown, so it opens
+   * directly beneath that card rather than somewhere further down the page.
+   * One map instance is reused: rebuilding it would re-fetch every tile.
+   */
+  function attachMapPanel(o, body) {
+    if (state.selectedKey !== o.key) return;
+    var panel = $('map-panel');
+    panel.hidden = false;
+    body.appendChild(panel);
   }
 
   /**
@@ -603,11 +663,17 @@
 
   function render() {
     var out = $('options');
+
+    // The map panel lives inside whichever card is showing it, so rescue it
+    // before the list is torn down or it would be destroyed with the cards.
+    var panel = $('map-panel');
+    if (panel.parentNode !== document.body) document.body.appendChild(panel);
+    if (!state.selectedKey) panel.hidden = true;
+
     out.innerHTML = '';
 
     if (!state.origin || !state.destination) {
       $('empty-state').hidden = false;
-      $('map-section').hidden = true;
       return;
     }
     $('empty-state').hidden = true;
@@ -631,7 +697,6 @@
       out.appendChild(el('p', 'notice', result.noShuttleReason));
     }
 
-    $('map-section').hidden = false;
   }
 
   function recompute() { render(); }
@@ -678,13 +743,6 @@
    */
   function showMapFor(option) {
     var container = $('map');
-    var toggle = $('map-toggle');
-
-    container.hidden = false;
-    $('map-note').hidden = false;
-    $('map-legend').hidden = false;
-    toggle.setAttribute('aria-expanded', 'true');
-    toggle.textContent = 'Hide map';
 
     loadLeaflet().then(function (L) {
       if (!state.map) {
@@ -704,6 +762,28 @@
 
       var bounds = [];
       var add = function (pts) { for (var i = 0; i < pts.length; i++) bounds.push(pts[i]); };
+
+      // --- where the bus carries on to, faded ---
+      // Shown so a rider can see that staying on leads somewhere useful. It is
+      // drawn thin and translucent: it is context, not the recommendation.
+      if (option.kind === 'shuttle') {
+        var onward = onwardShape(option);
+        if (onward.length > 1) {
+          L.polyline(onward, {
+            color: option.route.colour, weight: 3.5, opacity: 0.5,
+            dashArray: '8 7', lineCap: 'butt', interactive: false
+          }).addTo(state.activeLayer);
+        }
+        (option.onwardStops || []).forEach(function (n) {
+          L.circleMarker([n.stop.lat, n.stop.lng], {
+            radius: 5, color: option.route.colour, weight: 2,
+            fillColor: '#fffdf8', fillOpacity: 1, opacity: 0.7
+          }).addTo(state.activeLayer).bindPopup(
+            '<strong>' + n.stop.name + '</strong><br>stay on for this stop' +
+            (n.walkMinutes != null
+              ? '<br>then about ' + Math.round(n.walkMinutes) + ' min walk' : ''));
+        });
+      }
 
       // --- the ridden stretch, in the route's colour ---
       if (option.kind === 'shuttle') {
@@ -766,8 +846,7 @@
 
     }).catch(function () {
       container.hidden = true;
-      $('map-legend').hidden = true;
-      $('map-note').hidden = false;
+      $('map-legend').innerHTML = '';
       $('map-note').textContent =
         'The map could not load. Everything above still works — the written ' +
         'instructions are the accurate part anyway.';
@@ -806,6 +885,18 @@
     return shape.line.slice(a, b + 1);
   }
 
+  /** The rest of the route after the alighting stop. */
+  function onwardShape(option) {
+    var shape = DATA.routeShapes[option.routeId];
+    if (!shape || !shape.line || !shape.stopIndices) return [];
+    var from = shape.stopIndices[option.alightIndex];
+    var last = option.onwardStops && option.onwardStops.length
+      ? shape.stopIndices[option.onwardStops[option.onwardStops.length - 1].index]
+      : shape.stopIndices[shape.stopIndices.length - 1];
+    if (typeof from !== 'number' || typeof last !== 'number' || last <= from) return [];
+    return shape.line.slice(from, last + 1);
+  }
+
   /** A walking leg along real footpaths, falling back to a straight line. */
   function walkLine(from, to) {
     if (!state.walkRouter && window.CUHK.WalkRouter && DATA.walkGraph) {
@@ -823,11 +914,12 @@
     var box = $('map-legend');
     box.innerHTML = '';
 
-    function row(colour, label, dashed) {
+    function row(colour, label, style) {
       var item = el('span', 'legend__item');
-      var swatch = el('span', 'legend__swatch' + (dashed ? ' legend__swatch--dashed' : ''));
-      swatch.style.background = dashed ? 'transparent' : colour;
-      if (dashed) swatch.style.borderTopColor = colour;
+      var swatch = el('span', 'legend__swatch' +
+        (style ? ' legend__swatch--' + style : ''));
+      swatch.style.background = style ? 'transparent' : colour;
+      if (style) swatch.style.borderTopColor = colour;
       item.appendChild(swatch);
       item.appendChild(el('span', null, label));
       box.appendChild(item);
@@ -837,33 +929,14 @@
       row(option.route.colour,
           option.route.name + (option.route.label ? ' · ' + option.route.label : ''));
     }
-    row(CFG.walkColour || '#1b7f4d', 'Your walk', true);
+    if (option.kind === 'shuttle' && option.onwardStops && option.onwardStops.length) {
+      row(option.route.colour, 'Where it carries on', 'dashed');
+    }
+    row(CFG.walkColour || '#1b7f4d', 'Your walk', 'dotted');
     var faint = el('span', 'legend__item legend__item--muted');
     faint.textContent = 'Faint lines are the other shuttle routes.';
     box.appendChild(faint);
   }
-
-  function wireMapToggle() {
-    var toggle = $('map-toggle');
-    toggle.addEventListener('click', function () {
-      var open = toggle.getAttribute('aria-expanded') === 'true';
-      if (open) {
-        $('map').hidden = true;
-        $('map-note').hidden = true;
-        $('map-legend').hidden = true;
-        toggle.setAttribute('aria-expanded', 'false');
-        toggle.textContent = 'Show map';
-        return;
-      }
-      var result = planner.plan(state.origin, state.destination, DATA, currentWhen());
-      var chosen = result.options.filter(function (o) { return o.key === state.selectedKey; })[0]
-                || result.options[0];
-      state.selectedKey = chosen.key;
-      render();
-      showMapFor(chosen);
-    });
-  }
-
 
   // =========================================================================
   // Network browser
@@ -1208,7 +1281,6 @@
       recompute();
     });
 
-    wireMapToggle();
     wireNetwork();
 
     // Waits count down in real time, so a stale screen is a wrong screen.

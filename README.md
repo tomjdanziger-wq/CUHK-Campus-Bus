@@ -253,7 +253,9 @@ These mattered more than features, so each one is enforced in a named place rath
 
 | Rule | Where |
 |---|---|
-| Wait shown as the real gap to the next scheduled departure, never an average | `formatWait`, `app.js` |
+| Wait shown as the real gap to the next scheduled departure, never an average | the wait row, `renderShuttleCard` |
+| Wait kept out of the headline time, but given its own prominent row | `travelMinutes` in `lib/planner.js`; `.waitline` |
+| Arrival time on every card, as the one like-for-like comparator | `formatArrivalRange`, `app.js` |
 | Durations shown as ranges, rounded to ~5 min | `formatRange`, `app.js` |
 | Arrival clock times rounded the same way as durations | `formatArrivalRange`, `app.js` |
 | Legs shown separately, never collapsed into one number | `renderShuttleCard`, `app.js` |
@@ -290,6 +292,10 @@ So the same script ships a compact routable footpath network (7,532 nodes, 8,020
 edges, coordinates as integers scaled by 1e6) and `lib/walkroute.js` runs
 Dijkstra over it in the browser, in a couple of milliseconds.
 
+The map opens directly beneath whichever option you asked to see, rather than in
+a section further down the page. There is one map instance, moved into the card
+that is showing it — rebuilding it per card would re-fetch every tile.
+
 **What you see:** every shuttle route drawn faintly, so the shape of the network
 is visible; the option you are looking at drawn on top in that route's own
 colour, for the ridden stretch only; your walking legs dashed in green on real
@@ -321,6 +327,42 @@ none do.
 > switchback hard: the 142 m hop from Science Centre to New Asia Circle gains
 > 39 m, which would be a 27% grade in a straight line, and is really 506 m of
 > road. A tighter ratio rejects correct geometry.
+
+## Time on the bus, and time waiting for it
+
+The headline figure on a shuttle option is **travel time** — walk, ride, walk.
+The wait is not folded into it. Rolling a nineteen-minute wait into "the bus
+takes thirty minutes" misrepresents the bus: the wait is a fact about when you
+turned up, not about the journey.
+
+The wait gets its own row instead, in amber, naming the departure it refers to.
+That makes it more prominent than it was when buried in the leg list, not less.
+
+Two things keep this honest, because a travel-only headline could otherwise
+flatter the bus against walking:
+
+- **Ranking still uses total time including the wait.** Arriving sooner is what
+  matters, and a bus you would wait forty minutes for should not outrank walking
+  because the ride itself is quick.
+- **Every card shows its arrival time**, at the same size and weight. That is
+  the one figure that is like-for-like between a bus and a walk, and often the
+  two are closer than the headlines suggest.
+
+## Where the bus goes next
+
+Under each shuttle option is **Or stay on for** — the stops the bus continues to
+after the one you were told to get off at, each with how far it would leave you
+from your destination on foot.
+
+The planner already weighed all of those and picked the best by arrival time.
+But its walking model is an estimate over an imperfectly mapped campus, and it
+values a minute uphill in August exactly the same as a minute sitting on a bus.
+Anyone who knows the ground can overrule it — and a later stop that leaves you
+meaningfully closer on foot is highlighted rather than hidden. It also shows the
+reasoning instead of just asserting the answer.
+
+On the map the continuation is drawn in the route's colour as a long dash, with
+hollow markers at those stops: context, visibly not the recommendation.
 
 ## Browsing the network
 

@@ -114,19 +114,18 @@
   </section>
 
   <!-- ------------------------------------------------------------------ -->
-  <!-- Map (optional, illustrative only)                                  -->
+  <!-- Map. Illustrative only — the written instructions are the product.  -->
+  <!-- This panel is moved into whichever option is being shown, so the    -->
+  <!-- map opens directly beneath the card it belongs to.                  -->
   <!-- ------------------------------------------------------------------ -->
-  <section id="map-section" class="map-section" hidden>
-    <button id="map-toggle" class="map-toggle" type="button" aria-expanded="false">
-      Show map
-    </button>
-    <div id="map" class="map" hidden role="img"
+  <div id="map-panel" class="map-panel" hidden>
+    <div id="map" class="map" role="img"
          aria-label="Illustrative map of the selected option"></div>
-    <div id="map-legend" class="legend" hidden></div>
-    <p id="map-note" class="map-note" hidden>
-      The map is illustrative. The written instructions above are the accurate part.
+    <div id="map-legend" class="legend"></div>
+    <p id="map-note" class="map-note">
+      Illustrative. The written instructions above are the accurate part.
     </p>
-  </section>
+  </div>
 
   <footer class="footer">
     <p id="validity" class="footer__validity"></p>

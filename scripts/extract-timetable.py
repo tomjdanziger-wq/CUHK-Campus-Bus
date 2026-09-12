@@ -134,26 +134,78 @@ def find(runs, pattern, flags=re.I):
         if m: return m
     return None
 
+def parse_days(text):
+    """'Mon to Fri; Teaching days only' -> 'mon-fri'."""
+    low = (text or '').lower()
+    if 'sun' in low and ('public' in low or '&' in low): return 'sun-ph'
+    if 'mon to fri' in low: return 'mon-fri'
+    if 'mon to sat' in low: return 'mon-sat'
+    if low.strip().startswith('sat') or '; sat' in low: return 'sat'
+    if 'public holidays' in low and 'except' not in low: return 'sun-ph'
+    return 'mon-sat'
+
+def service_blocks(runs):
+    """
+    Every "Service Hours" block on the page, in order.
+
+    The meet-class routes publish two: a Monday-to-Friday block and a shorter
+    Saturday one, each with its own hours and departure minutes. Reading only
+    the first would have the app offering Saturday buses four hours after they
+    stop running.
+
+    Each block is laid out as three stacked lines:
+
+        Service Hours
+        09:18 - 17:26      Mon to Fri; Teaching days only
+        Departure Time (mins)      18, 22, 26
+    """
+    labels = sorted(
+        [r for r in runs if clean(r['text']).startswith('Service Hours')],
+        key=lambda r: -r['y'])
+    if not labels:
+        return []
+
+    blocks = []
+    for i, label in enumerate(labels):
+        top = label['y']
+        floor = labels[i + 1]['y'] if i + 1 < len(labels) else top - 120
+
+        nearby = [r for r in runs if floor < r['y'] < top + 5]
+
+        hours, days, mins = None, '', []
+        for r in sorted(nearby, key=lambda r: -r['y']):
+            t = clean(r['text'])
+            m = re.search(r'(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})', t)
+            if m and not hours:
+                hours = (m.group(1), m.group(2))
+                # The days sit to the right on the same line.
+                same = [x for x in nearby if abs(x['y'] - r['y']) < 10 and x['x'] > r['x']]
+                days = ' '.join(clean(x['text']) for x in sorted(same, key=lambda x: x['x']))
+                continue
+
+            if 'Departure Time' in t and not mins:
+                same = [x for x in nearby
+                        if abs(x['y'] - r['y']) < 12 and x['x'] >= r['x']]
+                joined = ' '.join(clean(x['text']) for x in sorted(same, key=lambda x: x['x']))
+                joined = joined.split('Departure Time (mins)')[-1].replace('Every', '')
+                joined = re.split(r'[A-Za-z]{4,}', joined)[0]
+                mins = [int(n) for n in re.findall(r'\b\d{1,2}\b', joined) if 0 <= int(n) <= 59]
+
+        if hours:
+            blocks.append({
+                'firstDeparture': hours[0],
+                'lastDeparture': hours[1],
+                'runsOn': parse_days(days),
+                'daysText': days,
+                'departureMinutes': sorted(set(mins)),
+            })
+    return blocks
+
 def meta(runs):
     """Service hours, departure minutes, service days, footnotes."""
-    hours = find(runs, r'(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})')
-    days_txt = ' '.join(clean(r['text']) for r in runs
-                        if re.search(r'For Mon|Sun & Public|Public Holidays', clean(r['text'])))
-
-    # The minute list sits to the right of the "Departure Time (mins)" label on
-    # the same line, but is split across several runs — footnote markers get
-    # their own run, so "15, # 45" arrives as three pieces. Collect the whole
-    # line and pull the numbers out of it.
-    mins = []
-    label = next((r for r in runs if 'Departure Time' in clean(r['text'])), None)
-    if label:
-        same_line = [r for r in runs
-                     if abs(r['y'] - label['y']) < 12 and r['x'] >= label['x']]
-        text = ' '.join(clean(r['text']) for r in sorted(same_line, key=lambda r: r['x']))
-        text = text.split('Departure Time (mins)')[-1]
-        # Stop at any footnote sentence that follows the list.
-        text = re.split(r'[A-Za-z]{4,}', text.replace('Every', ''))[0]
-        mins = [int(x) for x in re.findall(r'\b\d{1,2}\b', text) if 0 <= int(x) <= 59]
+    blocks = service_blocks(runs)
+    if not blocks:
+        raise SystemExit('could not find a Service Hours block')
 
     # Footnotes appear twice: in full under the header, and as short fragments
     # printed beside the stop they qualify. Keep the full versions only.
@@ -168,25 +220,33 @@ def meta(runs):
                     text += ' ' + tail
         return re.sub(r'^#\s*', '', text).strip()
 
+    # The service-days text ("Mon to Fri; Teaching days only") matches the
+    # footnote pattern too, but it is already captured as `runsOn` and reads as
+    # noise when repeated on the card.
+    day_texts = {b['daysText'].strip().lower() for b in blocks}
+
     cands = [with_continuation(r) for r in runs if NOTE_RE.search(clean(r['text']))]
     notes = []
     for c in sorted(set(cands), key=len, reverse=True):
+        if c.strip().lower() in day_texts: continue
         if not any(c in kept for kept in notes) and len(c) > 25:
             notes.append(c)
 
-    low = days_txt.lower()
-    if 'sun & public' in low or re.search(r'sun\s*&', low):
-        days = 'sun-ph'
-    elif 'mon to fri' in low:
-        days = 'mon-fri'
-    else:
-        days = 'mon-sat'
+    # A meet-class route only runs when classes do, and the app has no academic
+    # calendar to check that against. Say so on the card.
+    if any('teaching days only' in b['daysText'].lower() for b in blocks):
+        notes.insert(0, 'Runs on teaching days only, so it may not be running today.')
+
+    primary = blocks[0]
     return {
-        'firstDeparture': hours.group(1) if hours else None,
-        'lastDeparture': hours.group(2) if hours else None,
-        'departureMinutes': sorted(set(mins)),
-        'runsOn': days,
-        'daysText': days_txt,
+        'firstDeparture': primary['firstDeparture'],
+        'lastDeparture': primary['lastDeparture'],
+        'departureMinutes': primary['departureMinutes'],
+        'runsOn': primary['runsOn'],
+        'serviceOverrides': [
+            {k: b[k] for k in ('runsOn', 'firstDeparture', 'lastDeparture', 'departureMinutes')}
+            for b in blocks[1:]
+        ],
         'footnotes': notes,
     }
 
@@ -292,6 +352,7 @@ def route(path):
         'firstDeparture': m['firstDeparture'],
         'lastDeparture': m['lastDeparture'],
         'runsOn': m['runsOn'],
+        'serviceOverrides': m['serviceOverrides'] or None,
         'notes': ' '.join(m['footnotes']) or None,
     }
 

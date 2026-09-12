@@ -112,21 +112,26 @@ silently.
 project root, so anything added there by hand is lost on the next run. Routes
 that have no PDF go in `extraRoutes` in `data/shuttle-data.js` instead.
 
-**Route 7** is currently one of these. It was not among the saved PDFs; its
-stops, departure minutes and hours were read off the Transport Office's own
-page for the route and cross-checked against the September 2026 service notice,
-which gives the same times. If you save its page as a PDF alongside the others,
-delete the `extraRoutes` entry — the extractor is more reliable than
-transcription.
+It is currently empty, and best kept that way. Route 7 lived there briefly,
+transcribed from the Transport Office website, and when the PDF arrived it had
+two stops the web page had not shown — the extractor reads the published
+diagram and is more reliable than any transcription, including mine.
 
-Route 7 also needed something the schema did not have: **different hours on
-different days** (17:18 on weekdays, 13:18 on Saturdays). A route may now carry
-`serviceOverrides`, a list of `{ runsOn, firstDeparture, lastDeparture }` where
-the first matching entry wins.
+### Routes with different hours on different days
 
-It is also a meet-class service that runs on teaching days only. The app has no
-academic calendar and cannot tell a teaching day from a reading week, so that
-caveat is carried in the route's `notes` and shown on the card rather than
+The meet-class routes — 5, 6A, 6B and 7 — publish two service blocks: a
+Monday-to-Friday one and a shorter Saturday one. Route 7 finishes at 17:18 on
+weekdays and 13:18 on Saturdays; route 6B does not run on Saturday at all.
+
+A route therefore carries `serviceOverrides`: a list of
+`{ runsOn, firstDeparture, lastDeparture, departureMinutes }` where the first
+entry matching the day wins. `scripts/extract-timetable.py` reads every
+"Service Hours" block on the page and emits them automatically, and `runsToday`
+counts a day covered by an override as a day the route runs.
+
+These are also meet-class services running on **teaching days only**. The app
+has no academic calendar and cannot tell a teaching day from a reading week, so
+that caveat is carried in the route's `notes` and shown on the card rather than
 silently assumed away.
 
 ### Quick picks

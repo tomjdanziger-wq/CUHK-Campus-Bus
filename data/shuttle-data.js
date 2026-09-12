@@ -204,6 +204,9 @@
       '3':  '#e07a1f',   // Shaw             — orange
       '4':  '#7b52ab',   // Campus Circuit   — purple
       '8':  '#00857a',   // Western Campus   — teal
+      '5':  '#b5651d',   // Upward           — burnt orange
+      '6A': '#7d5ba6',   // Downward (CWC)   — violet
+      '6B': '#a8869e',   // Downward (NA/UC) — muted mauve
       '7':  '#6b7a1f',   // Downward (Shaw)  — olive
       'N':  '#3f4e7a',   // Night Service    — indigo
       'H':  '#b5179e'    // Holidays Service — magenta
@@ -293,42 +296,18 @@
   };
 
   // -------------------------------------------------------------------------
-  // EXTRA ROUTES — routes that are not in the PDF set.
+  // EXTRA ROUTES — routes that have no PDF.
   //
   // scripts/extract-timetable.py rebuilds data/routes.generated.js from
   // whatever route PDFs are in the project root, so anything added there is
-  // lost on the next run. Routes added by hand live here instead.
+  // lost on the next run. Routes added by hand go here instead.
   //
-  // Save the route's page as a PDF alongside the others and delete the entry
-  // here when you do — the extractor is more reliable than transcription.
+  // Empty, and best kept that way: the extractor reads the published diagram
+  // and is more reliable than transcription. Route 7 lived here briefly, taken
+  // off the Transport Office website, and the PDF turned out to have two stops
+  // the web page had not shown us.
   // -------------------------------------------------------------------------
   var extraRoutes = [
-    {
-      // Not among the saved PDFs. Taken from the Transport Office's own page
-      // for the route (transport.cuhk.edu.hk/route/7/) on 2026-09-12, and
-      // cross-checked against the 1 September 2026 service notice, which gives
-      // the same departure minutes and hours.
-      id: '7',
-      name: 'Route 7',
-      nameZh: '七號線',
-      label: 'Downward (Shaw)',
-      stops: [
-        'wu-yee-sun-down', 'new-asia-college', 'united-college-down',
-        'univ-admin', 'sh-ho-college', 'station-piazza'
-      ],
-      departureMinutes: [0, 18],
-      firstDeparture: '08:18',
-      lastDeparture: '17:18',
-      runsOn: 'mon-sat',
-      // Saturday finishes four hours earlier.
-      serviceOverrides: [
-        { runsOn: 'sat', firstDeparture: '08:18', lastDeparture: '13:18' }
-      ],
-      // The app has no academic calendar, so it cannot know a teaching day
-      // from a reading week. Said plainly on the card instead.
-      notes: 'Meet-class service — runs on teaching days only, so it may not be ' +
-             'running today. Saturday service ends at 13:18.'
-    }
   ];
 
   var routes = (root.CUHK_ROUTES_GENERATED || []).concat(extraRoutes).map(function (r, i) {

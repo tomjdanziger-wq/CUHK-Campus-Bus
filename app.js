@@ -1285,24 +1285,6 @@
     supermarket: 'Supermarket', deli: 'Deli', coffee: 'Coffee shop'
   };
 
-  /**
-   * OpenStreetMap's opening-hours syntax, lightly humanised.
-   *
-   * Deliberately NOT parsed into an open/closed answer. Getting that wrong
-   * means telling somebody a canteen is open when it is not, and they walk up
-   * a hill for nothing. The raw published hours, made readable, say enough.
-   */
-  function readableHours(spec) {
-    return spec
-      .replace(/\bMo\b/g, 'Mon').replace(/\bTu\b/g, 'Tue').replace(/\bWe\b/g, 'Wed')
-      .replace(/\bTh\b/g, 'Thu').replace(/\bFr\b/g, 'Fri').replace(/\bSa\b/g, 'Sat')
-      .replace(/\bSu\b/g, 'Sun').replace(/\bPH\b/g, 'public holidays')
-      .replace(/\bSH\b/g, 'school holidays')
-      .replace(/\boff\b/g, 'closed')
-      .replace(/(\d)-(\d)/g, '$1–$2')
-      .replace(/;\s*/g, ' · ');
-  }
-
   /** "↑ 44 m" / "↓ 30 m" / "level" — the gradient at a glance. */
   function compactClimb(walk) {
     var d = walk.deltaElevation;
@@ -1360,7 +1342,7 @@
         return { place: p, walk: geo.walk(from, p, CFG) };
       }).sort(function (a, b) { return a.walk.minutes - b.walk.minutes; });
       note.textContent = places.length + ' places, nearest to ' + from.name + ' first. ' +
-        'Tap one to plan the trip.';
+        'Tap one to plan the trip — or just search for "canteen" or "coffee".';
     } else {
       places = places.map(function (p) { return { place: p, walk: null }; })
         .sort(function (a, b) { return a.place.name.localeCompare(b.place.name); });
@@ -1382,12 +1364,7 @@
       // Some OSM entries repeat the English name in the Chinese field.
       if (p.nameZh && p.nameZh !== p.name) sub.push(p.nameZh);
       sub.push(CATEGORY_LABELS[p.food.category] || p.food.category);
-      if (p.food.cuisine) sub.push(p.food.cuisine.replace(/[_;]/g, ' '));
       main.appendChild(el('span', 'foodlist__sub', sub.join(' · ')));
-
-      main.appendChild(el('span', 'foodlist__hours',
-        p.food.hours ? readableHours(p.food.hours) : 'Opening hours not published'));
-      if (!p.food.hours) main.lastChild.classList.add('foodlist__hours--unknown');
 
       btn.appendChild(main);
 

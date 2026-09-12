@@ -785,15 +785,6 @@ body {
 .foodlist__main { flex: 1; min-width: 0; }
 .foodlist__name { display: block; font-size: 15.5px; font-weight: 500; }
 .foodlist__sub  { display: block; font-size: 13.5px; color: var(--ink-3); margin-top: 1px; }
-.foodlist__hours {
-  display: block;
-  font-size: 13px;
-  color: var(--ink-2);
-  margin-top: 3px;
-}
-/* Said plainly rather than left blank: not knowing is information too. */
-.foodlist__hours--unknown { color: var(--ink-3); font-style: italic; }
-
 .foodlist__dist {
   flex-shrink: 0;
   width: 62px;

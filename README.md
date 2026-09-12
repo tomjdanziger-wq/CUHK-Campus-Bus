@@ -480,40 +480,41 @@ Stop codes live in the `abbr` field of each stop in `data/shuttle-data.js`. On a
 campus-wide view the labels collapse to dots — twenty-nine of them at that zoom
 overlap into an unreadable pile — and reappear when you select a route or zoom in.
 
-## Places to eat
+## Canteens and other food places
 
-**Places to eat** lists every canteen, café, restaurant and food shop on campus
-— 72 of them — sorted by how far they are from wherever you have said you are,
-with the walk and the climb. Tap one and it becomes your destination.
+All 72 canteens, cafés, restaurants and food shops on campus are searchable
+destinations, and **findable without knowing their names**. Typing `canteen`,
+`coffee`, `food`, `lunch`, `食堂` or `咖啡` into the To box lists them; picking
+one plans the trip like any other destination.
 
-The point is not to replace a restaurant guide. It is that finding a canteen
-should not mean leaving the app, looking the name up on a map somewhere else,
-and coming back.
+That is the point — you should not have to already know that the place you want
+is called "Café 12" or "The Harmony", nor leave the app to look it up on a map
+somewhere else.
 
 They are identified by **OpenStreetMap's own categories**, not by matching words
-in names. Matching words finds "Student Canteen" and misses "Café 12", "Food
-Lab" and "The Harmony", while happily picking up anything with "Kitchen" in the
-name that is not a kitchen. `scripts/extract-places.js` now stores a `food`
-block — category, cuisine and opening hours — on the places that have one, and
-nothing at all on the places that do not, which keeps the shipped file small.
+in names. Name matching finds 28 of the 72: it misses "Café 12", "Food Lab" and
+"The Harmony" while happily picking up anything with "Kitchen" in the name that
+is not a kitchen. `scripts/extract-places.js` stores a `food` block — category,
+cuisine, opening hours — on the places that have one and nothing on the places
+that do not, which costs about 8 KB.
 
-### On opening hours
+The category becomes a set of search aliases in `foodSearchTerms`
+(`data/shuttle-data.js`), so it works through the same fuzzy search as
+everything else: no separate mode, no category picker to learn. A place whose
+own name also contains the word ranks above one that merely carries the
+category, so `canteen` reaches Shaw College Student Canteen before it reaches a
+noodle bar that happens to be tagged as one.
 
-Only **14 of the 72** have published hours, and they come from OpenStreetMap.
+**Places to eat** is a second way in: the same list sorted by how far each one
+is from wherever you have said you are, filterable by kind. It is a finder, not
+a food guide — it deliberately shows only name, kind and distance.
 
-The University's Finance Office publishes authoritative hours, but only for the
-ten centrally-run outlets, and only as a PDF whose text sits inside Form
-XObjects that the extractor in `scripts/_pdfpos.py` does not recurse into — so
-half the times came out missing and the page footer came out looking like a
-canteen. College canteens are published on each college's own website in a
-different format every time. Neither is currently wired in.
-
-Where hours are known they are shown as published text, lightly humanised
-(`Mo-Su 07:30-21:00` → `Mon–Sun 07:30–21:00`). They are deliberately **not**
-parsed into an "open now" badge. Getting that wrong means telling somebody a
-canteen is open when it is closed and sending them up a hill for nothing, and a
-badge that is right most of the time is worse than a line of text that is always
-right. Where hours are not known, the card says so rather than leaving a gap.
+Opening hours are stored where OpenStreetMap has them (14 of 72) but are not
+displayed. The Finance Office publishes authoritative hours for the ten
+centrally-run outlets, in a PDF whose text sits inside Form XObjects that
+`scripts/_pdfpos.py` does not recurse into; college canteens are on each
+college's own site in a different format every time. Wiring either in is a
+bigger job than the data is currently worth.
 
 ## Searching
 

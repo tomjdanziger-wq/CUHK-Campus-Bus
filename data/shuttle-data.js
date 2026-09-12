@@ -461,12 +461,39 @@
   // Assembly. Shuttle stops are also valid destinations, so they get folded
   // into the searchable places list.
   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // FOOD SEARCH TERMS
+  //
+  // So that somebody looking for lunch can type "canteen" or "食堂" and find
+  // one, instead of having to already know that the place they want is called
+  // "Café 12" or "The Harmony".
+  //
+  // These are added as aliases, which means they work through the same fuzzy
+  // search as everything else — no separate mode, no category picker to learn.
+  // -------------------------------------------------------------------------
+  var foodSearchTerms = {
+    restaurant:  ['restaurant', 'canteen', 'food', 'eat', 'lunch', 'dinner', '餐廳', '食堂', '膳堂'],
+    canteen:     ['canteen', 'restaurant', 'food', 'eat', 'lunch', 'dinner', '餐廳', '食堂', '膳堂'],
+    food_court:  ['food court', 'canteen', 'food', 'eat', 'lunch', '美食廣場', '食堂'],
+    fast_food:   ['fast food', 'canteen', 'food', 'eat', 'lunch', '快餐', '食堂'],
+    cafe:        ['cafe', 'café', 'coffee', 'food', 'eat', '咖啡', '咖啡室'],
+    bakery:      ['bakery', 'bread', 'food', 'eat', '麵包'],
+    ice_cream:   ['ice cream', 'dessert', 'food', '雪糕'],
+    bar:         ['bar', 'drinks', 'pub'],
+    pub:         ['pub', 'bar', 'drinks'],
+    convenience: ['convenience store', 'shop', 'snacks', '便利店'],
+    supermarket: ['supermarket', 'groceries', 'shop', '超級市場', '超市'],
+    deli:        ['deli', 'food', 'shop'],
+    coffee:      ['coffee', 'cafe', '咖啡']
+  };
+
   var generated = (root.CUHK_PLACES_GENERATED || []).map(function (p) {
     return {
       id: p.id,
       name: p.name,
       nameZh: p.nameZh,
-      aliases: (placeAliases[p.id] || []).slice(),
+      aliases: (placeAliases[p.id] || []).slice()
+        .concat(p.food ? (foodSearchTerms[p.food.category] || []) : []),
       lat: p.lat,
       lng: p.lng,
       elevation: p.elevation,

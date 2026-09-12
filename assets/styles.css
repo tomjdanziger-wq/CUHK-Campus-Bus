@@ -586,7 +586,6 @@ body {
 .leg__label { font-weight: 500; }
 .leg__sub { display: block; font-size: 13px; color: var(--ink-3); }
 .leg__time { flex-shrink: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
-.legs li.leg--wait .leg__time { color: var(--warn); }
 
 /* --- departures --------------------------------------------------------- */
 

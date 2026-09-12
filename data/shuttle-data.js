@@ -131,12 +131,17 @@
       // you the climb.
       minWalkSavedMinutes: 3,
 
-      // Flag an option as the long way round when it loses to the best option
-      // by this much despite boarding within `longWayRoundWalkMinutes` of it.
-      // On a campus of one-way loops the uphill and downhill stops sit metres
-      // apart and send you in opposite directions, so this is easy to get
-      // wrong and expensive when you do.
-      longWayRoundThresholdMinutes: 8,
+      // Flag an option as the long way round when it spends this much longer
+      // RIDING than a bus you could catch from within
+      // `longWayRoundWalkMinutes`. On a campus of one-way loops the uphill and
+      // downhill stops sit metres apart and send you in opposite directions,
+      // so this is easy to get wrong and expensive when you do.
+      //
+      // Measured on riding time, not total, so that having just missed the
+      // right bus is never mistaken for standing at the wrong stop. Real
+      // wrong-side journeys run about eight minutes longer in the vehicle;
+      // a missed bus rides the same distance and loses its time waiting.
+      longWayRoundThresholdMinutes: 6,
       longWayRoundWalkMinutes: 4,
 
       // Two routes running the same stretch are shown as one option when

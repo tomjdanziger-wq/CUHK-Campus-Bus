@@ -128,19 +128,6 @@
     return '~' + Math.round(minutes) + ' min';
   }
 
-  /**
-   * The wait. This one is NOT an average and NOT rounded coarsely.
-   *
-   * Showing "~7 min average wait" to somebody who has just watched a bus pull
-   * away, when the next is in 19 minutes, is the single most harmful thing
-   * this app could do. So we show the real gap to the actual next scheduled
-   * departure, and we name the time.
-   */
-  function formatWait(minutes) {
-    if (minutes < 0.75) return 'leaving now';
-    return Math.round(minutes) + ' min';
-  }
-
   /** Plain-language elevation, with direction. Never just a distance. */
   function describeElevation(walkResult) {
     var notable = CFG.display.notableElevationMetres;
@@ -537,11 +524,11 @@
       var otherSide = lw.better.boardStop.side === 'up' ? 'uphill' : 'downhill';
       card.appendChild(flag('alert', 'flag--danger flag--boxed',
         lw.sameStopPair
-          ? 'Wrong side for this trip. The ' + otherSide + ' stop gets you there ' +
-            'about ' + Math.round(lw.penaltyMinutes) + ' min sooner. Take this one ' +
+          ? 'Wrong side for this trip. From the ' + otherSide + ' stop the ride is ' +
+            'about ' + Math.round(lw.penaltyMinutes) + ' min shorter. Take this one ' +
             'only if you just want to be on a bus.'
           : 'The long way round — about ' + Math.round(lw.penaltyMinutes) +
-            ' min slower than ' + lw.better.route.name + ' from ' +
+            ' min more riding than ' + lw.better.route.name + ' from ' +
             lw.better.boardStop.name + '. Take it only if you just want to be on a bus.'));
     }
 
@@ -560,7 +547,8 @@
     // Not folded into the headline and not buried in the leg list. If you have
     // just watched a bus pull away, the gap to the next one is the single most
     // important number on the screen, and it is the one an "average wait"
-    // would quietly lie about.
+    // would quietly lie about — so this is the real gap to the next scheduled
+    // departure, named, and never rounded to a comfortable-looking figure.
     var waitRow = el('p', 'waitline');
     waitRow.appendChild(icon('clock'));
     var waitText = el('span', 'waitline__text');

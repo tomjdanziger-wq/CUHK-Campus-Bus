@@ -284,7 +284,14 @@ It deliberately does **not** assume the nearest stop is the right stop. Sometime
    keeps its own card, because that is a genuinely different ride.
 2. **Dominance.** An option must save at least `minWalkSavedMinutes` (3) of *walking* versus going on foot the whole way. This kills suggestions like "walk 5 minutes to a stop and 14 minutes from the next one" to avoid a 17-minute walk. The filter is about walking, not total time — a bus that merely ties with walking still saves you the climb and stays on the list.
 3. **Sanity cap.** Options losing to the walk by more than `maxWorseThanWalkMinutes` (15) are dropped. A 58-minute wait next to an 8-minute stroll is honest and useless.
-4. **One per boarding stop.** Two ways to leave from the same place is noise.
+4. **One per bus, per stop.** Two options from the same stop that share a
+   route are the same bus — the only difference is where you get off, which
+   "Or stay on for" already covers. Kept greedily, best first.
+
+   Deliberately *not* one option per boarding stop. From the downhill kerb at
+   Wu Yee Sun, Route 4 runs to the station door while routes 3, 7 and 6A stop
+   at the Piazza three minutes short. Standing in the same spot, those are two
+   real choices.
 5. **The 8-minute rule.** A boarding stop further away than the nearest one is surfaced *only* when it beats the best nearby option by `furtherStopThresholdMinutes` (8) or more. Everything here carries roughly ±30% error; recommending a 6-minute uphill walk to save a predicted 3 minutes would often be wrong, and being wrong about that is worse than staying quiet. When it does fire, the card says how much further and how much sooner.
 6. **Ties break toward less walking.** At this granularity options tie constantly, and when two get you there at the same moment the one with less walking is simply better advice.
 
@@ -411,13 +418,26 @@ So the app does three things:
   means nothing to somebody new, so the card adds *"the downhill side of the
   road — buses heading down the hill."*
 - Marks the long way round **in red** — the only red in the interface. An
-  option that loses to the best one by `longWayRoundThresholdMinutes` (8) while
-  boarding within `longWayRoundWalkMinutes` (4) of it is somewhere you could
-  just as easily have stood, so taking it is a mistake rather than a trade-off.
+  option that spends `longWayRoundThresholdMinutes` (6) longer **riding** than
+  a bus you could catch from within `longWayRoundWalkMinutes` (4) is somewhere
+  you could just as easily have stood, so taking it is a mistake rather than a
+  trade-off.
 
-These options are not hidden. Sometimes you want to sit down, or it is raining,
-or the quick bus is half an hour away. The card just says plainly that this is
-the slow way and names the stop that is not, so nobody boards it by accident.
+  The comparison is riding time, not total time, and that distinction is the
+  whole thing. Measured on total, this flagged Route 4 from Wu Yee Sun — the
+  direct bus to the station door, boarding on the correct kerb — purely because
+  its next departure was fifteen minutes away. Telling someone they are on the
+  wrong side of the road when they have simply just missed the bus is worse
+  than saying nothing. On the real cases the penalty is about eight extra
+  minutes in the vehicle; on a missed bus the ride is the same length or
+  shorter and every lost minute is in the wait.
+
+These options are not hidden, but they do not get a slot ahead of a sensible
+one: the list fills with unflagged options first, and only then with flagged
+ones. Nothing is lost by that, since an option is only flagged when some
+unflagged bus already beats it. Sometimes you want to sit down, or it is
+raining, or the quick bus is half an hour away — the card just says plainly
+that this is the slow way and names the stop that is not.
 
 A stop that is genuinely further away and slower is not flagged. That is not a
 mistake, it is just further away — the eight-minute rule already covers it.

@@ -131,6 +131,14 @@
       // you the climb.
       minWalkSavedMinutes: 3,
 
+      // Flag an option as the long way round when it loses to the best option
+      // by this much despite boarding within `longWayRoundWalkMinutes` of it.
+      // On a campus of one-way loops the uphill and downhill stops sit metres
+      // apart and send you in opposite directions, so this is easy to get
+      // wrong and expensive when you do.
+      longWayRoundThresholdMinutes: 8,
+      longWayRoundWalkMinutes: 4,
+
       // Two routes running the same stretch are shown as one option when
       // their ride times are within this of each other — you board whichever
       // comes first, so presenting them separately fakes a decision and hides
@@ -212,6 +220,12 @@
   // overlap into an unreadable mess. The ↑ / ↓ suffix is the uphill/downhill
   // side of the road, matching the Transport Office's own naming.
   //
+  // `pair` and `side` mark the two halves of a stop that exists on both sides
+  // of the road. They are the same place to walk to and a completely different
+  // journey to board: from the downhill side of Wu Yee Sun you reach the
+  // station in 9 minutes, from the uphill side the bus goes the long way round
+  // the campus and takes 21.
+  //
   // Several stops exist as an (Upward)/(Downward) pair on opposite sides of
   // the road. Where OpenStreetMap maps only one of the pair, both share that
   // position — they are metres apart, well inside the walking model's error.
@@ -224,28 +238,28 @@
     { id: 'univ-sports-centre'        , name: "University Sports Centre"             , nameZh: "大學體育中心", lat: 22.417812, lng: 114.210482, elevation:  45 , abbr: 'SPT' },
     { id: 'sh-ho-college'             , name: "S.H. Ho College"                      , nameZh: "善衡書院", lat: 22.418042, lng: 114.209850, elevation:  49 , abbr: 'SHH' },
     { id: 'postgrad-hall-1'           , name: "Postgraduate Hall 1"                  , nameZh: "賽馬會研究生宿舍一座", lat: 22.420248, lng: 114.212171, elevation:  32 , abbr: 'PG1' },
-    { id: 'campus-circuit-east-up'    , name: "Campus Circuit East (Upward)"         , nameZh: "環迴東路（上行）", lat: 22.421533, lng: 114.211835, elevation:  55 , abbr: 'CCE↑' },  // APPROXIMATE — road-side stop, position not in OSM
-    { id: 'campus-circuit-east-down'  , name: "Campus Circuit East (Downward)"       , nameZh: "環迴東路（下行）", lat: 22.421533, lng: 114.211835, elevation:  55 , abbr: 'CCE↓' },  // APPROXIMATE — road-side stop, position not in OSM
-    { id: 'campus-circuit-north-down' , name: "Campus Circuit North (Downward)"      , nameZh: "環迴北路（下行）", lat: 22.424445, lng: 114.209261, elevation:  11 , abbr: 'CCN↓' },  // APPROXIMATE — road-side stop, position not in OSM
+    { id: 'campus-circuit-east-up'    , name: "Campus Circuit East (Upward)"         , nameZh: "環迴東路（上行）", lat: 22.421533, lng: 114.211835, elevation:  55 , abbr: 'CCE↑' , pair: 'campus-circuit-east', side: 'up' },  // APPROXIMATE — road-side stop, position not in OSM
+    { id: 'campus-circuit-east-down'  , name: "Campus Circuit East (Downward)"       , nameZh: "環迴東路（下行）", lat: 22.421533, lng: 114.211835, elevation:  55 , abbr: 'CCE↓' , pair: 'campus-circuit-east', side: 'down' },  // APPROXIMATE — road-side stop, position not in OSM
+    { id: 'campus-circuit-north-down' , name: "Campus Circuit North (Downward)"      , nameZh: "環迴北路（下行）", lat: 22.424445, lng: 114.209261, elevation:  11 , abbr: 'CCN↓' , pair: 'campus-circuit-north', side: 'down' },  // APPROXIMATE — road-side stop, position not in OSM
     { id: 'sir-run-run-shaw-hall'     , name: "Sir Run Run Shaw Hall"                , nameZh: "邵逸夫堂", lat: 22.419841, lng: 114.206942, elevation: 102 , abbr: 'SRS' },
     { id: 'science-centre'            , name: "Science Centre"                       , nameZh: "科學館", lat: 22.419830, lng: 114.207342, elevation: 102 , abbr: 'SCI' },
     { id: 'fung-king-hey'             , name: "Fung King Hey Building"               , nameZh: "馮景禧樓", lat: 22.419864, lng: 114.203032, elevation: 113 , abbr: 'FKH' },
     { id: 'univ-admin'                , name: "University Administration Building"   , nameZh: "大學行政樓", lat: 22.418806, lng: 114.205358, elevation: 100 , abbr: 'ADM' },
-    { id: 'united-college-up'         , name: "United College (Upward)"              , nameZh: "聯合書院（上行）", lat: 22.420390, lng: 114.205394, elevation: 136 , abbr: 'UC↑' },
-    { id: 'united-college-down'       , name: "United College (Downward)"            , nameZh: "聯合書院（下行）", lat: 22.420302, lng: 114.205340, elevation: 133 , abbr: 'UC↓' },
+    { id: 'united-college-up'         , name: "United College (Upward)"              , nameZh: "聯合書院（上行）", lat: 22.420390, lng: 114.205394, elevation: 136 , abbr: 'UC↑' , pair: 'united-college', side: 'up' },
+    { id: 'united-college-down'       , name: "United College (Downward)"            , nameZh: "聯合書院（下行）", lat: 22.420302, lng: 114.205340, elevation: 133 , abbr: 'UC↓' , pair: 'united-college', side: 'down' },
     { id: 'new-asia-college'          , name: "New Asia College"                     , nameZh: "新亞書院", lat: 22.421271, lng: 114.207559, elevation: 142 , abbr: 'NA' },
     { id: 'new-asia-circle'           , name: "New Asia Circle"                      , nameZh: "新亞坊", lat: 22.421072, lng: 114.207647, elevation: 141 , abbr: 'NAC' },
-    { id: 'wu-yee-sun-up'             , name: "Wu Yee Sun College (Upward)"          , nameZh: "伍宜孫書院（上行）", lat: 22.421331, lng: 114.203471, elevation: 114 , abbr: 'WYS↑' },
-    { id: 'wu-yee-sun-down'           , name: "Wu Yee Sun College (Downward)"        , nameZh: "伍宜孫書院（下行）", lat: 22.421199, lng: 114.203521, elevation: 116 , abbr: 'WYS↓' },
+    { id: 'wu-yee-sun-up'             , name: "Wu Yee Sun College (Upward)"          , nameZh: "伍宜孫書院（上行）", lat: 22.421331, lng: 114.203471, elevation: 114 , abbr: 'WYS↑' , pair: 'wu-yee-sun', side: 'up' },
+    { id: 'wu-yee-sun-down'           , name: "Wu Yee Sun College (Downward)"        , nameZh: "伍宜孫書院（下行）", lat: 22.421199, lng: 114.203521, elevation: 116 , abbr: 'WYS↓' , pair: 'wu-yee-sun', side: 'down' },
     { id: 'chan-chun-ha'              , name: "Chan Chun Ha Hostel"                  , nameZh: "陳震夏宿舍", lat: 22.421812, lng: 114.204612, elevation: 119 , abbr: 'CCH' },
-    { id: 'shaw-college-up'           , name: "Shaw College (Upward)"                , nameZh: "逸夫書院（上行）", lat: 22.422486, lng: 114.201315, elevation:  82 , abbr: 'SHW↑' },  // up/down stops share one mapped position
-    { id: 'shaw-college-down'         , name: "Shaw College (Downward)"              , nameZh: "逸夫書院（下行）", lat: 22.422486, lng: 114.201315, elevation:  82 , abbr: 'SHW↓' },  // up/down stops share one mapped position
+    { id: 'shaw-college-up'           , name: "Shaw College (Upward)"                , nameZh: "逸夫書院（上行）", lat: 22.422486, lng: 114.201315, elevation:  82 , abbr: 'SHW↑' , pair: 'shaw-college', side: 'up' },  // up/down stops share one mapped position
+    { id: 'shaw-college-down'         , name: "Shaw College (Downward)"              , nameZh: "逸夫書院（下行）", lat: 22.422486, lng: 114.201315, elevation:  82 , abbr: 'SHW↓' , pair: 'shaw-college', side: 'down' },  // up/down stops share one mapped position
     { id: 'uc-staff-residence'        , name: "United College Staff Residence"       , nameZh: "聯合苑", lat: 22.423259, lng: 114.205130, elevation:  83 , abbr: 'UCS' },
     { id: 'residence-15'              , name: "Residence No. 15"                     , nameZh: "十五苑", lat: 22.423716, lng: 114.206598, elevation:  62 , abbr: 'R15' },
-    { id: 'cw-chu-up'                 , name: "C.W. Chu College (Upward)"            , nameZh: "敬文書院（上行）", lat: 22.425557, lng: 114.206218, elevation:  23 , abbr: 'CWC↑' },  // up/down stops share one mapped position
-    { id: 'cw-chu-down'               , name: "C.W. Chu College (Downward)"          , nameZh: "敬文書院（下行）", lat: 22.425557, lng: 114.206218, elevation:  23 , abbr: 'CWC↓' },  // up/down stops share one mapped position
-    { id: 'area-39-up'                , name: "Area 39 (Upward)"                     , nameZh: "三十九區（上行）", lat: 22.427631, lng: 114.204351, elevation:   9 , abbr: 'A39↑' },  // up/down stops share one mapped position
-    { id: 'area-39-down'              , name: "Area 39 (Downward)"                   , nameZh: "三十九區（下行）", lat: 22.427631, lng: 114.204351, elevation:   9 , abbr: 'A39↓' },  // up/down stops share one mapped position
+    { id: 'cw-chu-up'                 , name: "C.W. Chu College (Upward)"            , nameZh: "敬文書院（上行）", lat: 22.425557, lng: 114.206218, elevation:  23 , abbr: 'CWC↑' , pair: 'cw-chu', side: 'up' },  // up/down stops share one mapped position
+    { id: 'cw-chu-down'               , name: "C.W. Chu College (Downward)"          , nameZh: "敬文書院（下行）", lat: 22.425557, lng: 114.206218, elevation:  23 , abbr: 'CWC↓' , pair: 'cw-chu', side: 'down' },  // up/down stops share one mapped position
+    { id: 'area-39-up'                , name: "Area 39 (Upward)"                     , nameZh: "三十九區（上行）", lat: 22.427631, lng: 114.204351, elevation:   9 , abbr: 'A39↑' , pair: 'area-39', side: 'up' },  // up/down stops share one mapped position
+    { id: 'area-39-down'              , name: "Area 39 (Downward)"                   , nameZh: "三十九區（下行）", lat: 22.427631, lng: 114.204351, elevation:   9 , abbr: 'A39↓' , pair: 'area-39', side: 'down' },  // up/down stops share one mapped position
   ];
 
   // -------------------------------------------------------------------------

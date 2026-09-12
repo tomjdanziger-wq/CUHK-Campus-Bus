@@ -265,6 +265,7 @@ These mattered more than features, so each one is enforced in a named place rath
 | GPS guess always stated and correctable in one tap | `renderOriginConfirmation`, `app.js` |
 | Tight connections flagged rather than hidden inside the range | `isTight`, `lib/planner.js` |
 | Estimated ride times labelled as estimated, on every leg and in a banner | `meta.rideTimesEstimated`, `renderShuttleCard` |
+| Boarding on the wrong side of the road flagged in red, not quietly ranked last | `flagLongWayRound`, `lib/planner.js` |
 
 The last one is not in the original spec and was added because the numbers demanded it: the total assumes you catch the bus, so when the slow end of the walking estimate lands after the departure, the range is quietly optimistic in a way the user cannot see. The card now says so and names the fallback departure.
 
@@ -347,6 +348,34 @@ flatter the bus against walking:
 - **Every card shows its arrival time**, at the same size and weight. That is
   the one figure that is like-for-like between a bus and a walk, and often the
   two are closer than the headlines suggest.
+
+## Which side of the road
+
+Almost every CUHK route is a one-way loop, and several stops exist as an
+(Upward)/(Downward) pair on opposite kerbs of the same road. They are the same
+place to walk to and a completely different journey to board: from the downhill
+side of Wu Yee Sun the station is nine minutes, from the uphill side the bus
+goes right round the campus and takes twenty-one.
+
+So the app does three things:
+
+- Keeps the two halves as separate stops everywhere — in search, in the
+  planner, on the map, and in the network browser, where their short codes carry
+  ↑ and ↓.
+- Says which kerb it means. "(Downward)" is the Transport Office's wording and
+  means nothing to somebody new, so the card adds *"the downhill side of the
+  road — buses heading down the hill."*
+- Marks the long way round **in red** — the only red in the interface. An
+  option that loses to the best one by `longWayRoundThresholdMinutes` (8) while
+  boarding within `longWayRoundWalkMinutes` (4) of it is somewhere you could
+  just as easily have stood, so taking it is a mistake rather than a trade-off.
+
+These options are not hidden. Sometimes you want to sit down, or it is raining,
+or the quick bus is half an hour away. The card just says plainly that this is
+the slow way and names the stop that is not, so nobody boards it by accident.
+
+A stop that is genuinely further away and slower is not flagged. That is not a
+mistake, it is just further away — the eight-minute rule already covers it.
 
 ## Where the bus goes next
 

@@ -494,7 +494,30 @@
       o.walkToStop.metres < 30
         ? "You're already here."
         : formatLeg(o.walkToStop.minutes) + ' walk · ' + describeWalk(o.walkToStop)));
+
+    // "(Downward)" is the Transport Office's wording and means nothing to
+    // somebody new. Say which kerb it is.
+    if (o.boardStop.side) {
+      board.appendChild(el('p', 'board__side',
+        o.boardStop.side === 'up'
+          ? 'The uphill side of the road — buses heading up the hill.'
+          : 'The downhill side of the road — buses heading down the hill.'));
+    }
     card.appendChild(board);
+
+    // --- boarding on the wrong side sends you round the whole campus ---
+    if (o.longWayRound) {
+      var lw = o.longWayRound;
+      var otherSide = lw.better.boardStop.side === 'up' ? 'uphill' : 'downhill';
+      card.appendChild(flag('alert', 'flag--danger flag--boxed',
+        lw.sameStopPair
+          ? 'Wrong side for this trip. The ' + otherSide + ' stop gets you there ' +
+            'about ' + Math.round(lw.penaltyMinutes) + ' min sooner. Take this one ' +
+            'only if you just want to be on a bus.'
+          : 'The long way round — about ' + Math.round(lw.penaltyMinutes) +
+            ' min slower than ' + lw.better.route.name + ' from ' +
+            lw.better.boardStop.name + '. Take it only if you just want to be on a bus.'));
+    }
 
     var body = el('div', 'opt__body');
 

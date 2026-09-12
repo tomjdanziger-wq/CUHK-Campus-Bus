@@ -106,6 +106,46 @@ Check 3 is why `validate-data.js` prints elevation profiles: a future layout
 change that breaks the assumption shows up as a saw-tooth rather than passing
 silently.
 
+### Routes that are not in the PDF set
+
+`data/routes.generated.js` is rebuilt from whatever route PDFs sit in the
+project root, so anything added there by hand is lost on the next run. Routes
+that have no PDF go in `extraRoutes` in `data/shuttle-data.js` instead.
+
+**Route 7** is currently one of these. It was not among the saved PDFs; its
+stops, departure minutes and hours were read off the Transport Office's own
+page for the route and cross-checked against the September 2026 service notice,
+which gives the same times. If you save its page as a PDF alongside the others,
+delete the `extraRoutes` entry — the extractor is more reliable than
+transcription.
+
+Route 7 also needed something the schema did not have: **different hours on
+different days** (17:18 on weekdays, 13:18 on Saturdays). A route may now carry
+`serviceOverrides`, a list of `{ runsOn, firstDeparture, lastDeparture }` where
+the first matching entry wins.
+
+It is also a meet-class service that runs on teaching days only. The app has no
+academic calendar and cannot tell a teaching day from a reading week, so that
+caveat is carried in the route's `notes` and shown on the card rather than
+silently assumed away.
+
+### Quick picks
+
+`config.quickPicks` puts one-tap buttons under the From and To boxes for the
+trips someone makes daily:
+
+```js
+quickPicks: {
+  from: [{ place: 'university-residence-nos-3', label: 'I House 6' }],
+  to:   [{ place: 'stop:univ-station',          label: 'MTR' }]
+}
+```
+
+`place` is an id from the merged places list — a generated OSM id, or
+`stop:<stop id>` for a shuttle stop. An id that no longer exists is skipped
+rather than breaking the page. They set the field exactly as picking from the
+search results would.
+
 ### Route schema
 
 `data/routes.generated.js` is auto-generated — do not hand-edit it. The shape:

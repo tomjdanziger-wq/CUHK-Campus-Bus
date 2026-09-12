@@ -182,6 +182,18 @@
       notableElevationMetres: 15
     },
 
+    // One-tap shortcuts under the From and To boxes, for the trips you make
+    // every day. `place` is an id from the merged places list — either a
+    // generated OSM id, or 'stop:<stop id>' for a shuttle stop.
+    quickPicks: {
+      from: [
+        { place: 'university-residence-nos-3', label: 'I House 6' }
+      ],
+      to: [
+        { place: 'stop:univ-station', label: 'MTR' }
+      ]
+    },
+
     // Route colours, used to draw each line on the map. Chosen to stay apart
     // from each other and to read against OpenStreetMap tiles in both themes.
     // 2S is a deliberate sibling shade of 2 — it is a variant of that route.
@@ -192,6 +204,7 @@
       '3':  '#e07a1f',   // Shaw             — orange
       '4':  '#7b52ab',   // Campus Circuit   — purple
       '8':  '#00857a',   // Western Campus   — teal
+      '7':  '#6b7a1f',   // Downward (Shaw)  — olive
       'N':  '#3f4e7a',   // Night Service    — indigo
       'H':  '#b5179e'    // Holidays Service — magenta
     },
@@ -279,7 +292,46 @@
     // '1': [2, 4, 2, 3, 2],
   };
 
-  var routes = (root.CUHK_ROUTES_GENERATED || []).map(function (r, i) {
+  // -------------------------------------------------------------------------
+  // EXTRA ROUTES — routes that are not in the PDF set.
+  //
+  // scripts/extract-timetable.py rebuilds data/routes.generated.js from
+  // whatever route PDFs are in the project root, so anything added there is
+  // lost on the next run. Routes added by hand live here instead.
+  //
+  // Save the route's page as a PDF alongside the others and delete the entry
+  // here when you do — the extractor is more reliable than transcription.
+  // -------------------------------------------------------------------------
+  var extraRoutes = [
+    {
+      // Not among the saved PDFs. Taken from the Transport Office's own page
+      // for the route (transport.cuhk.edu.hk/route/7/) on 2026-09-12, and
+      // cross-checked against the 1 September 2026 service notice, which gives
+      // the same departure minutes and hours.
+      id: '7',
+      name: 'Route 7',
+      nameZh: '七號線',
+      label: 'Downward (Shaw)',
+      stops: [
+        'wu-yee-sun-down', 'new-asia-college', 'united-college-down',
+        'univ-admin', 'sh-ho-college', 'station-piazza'
+      ],
+      departureMinutes: [0, 18],
+      firstDeparture: '08:18',
+      lastDeparture: '17:18',
+      runsOn: 'mon-sat',
+      // Saturday finishes four hours earlier.
+      serviceOverrides: [
+        { runsOn: 'sat', firstDeparture: '08:18', lastDeparture: '13:18' }
+      ],
+      // The app has no academic calendar, so it cannot know a teaching day
+      // from a reading week. Said plainly on the card instead.
+      notes: 'Meet-class service — runs on teaching days only, so it may not be ' +
+             'running today. Saturday service ends at 13:18.'
+    }
+  ];
+
+  var routes = (root.CUHK_ROUTES_GENERATED || []).concat(extraRoutes).map(function (r, i) {
     var seg = rideTimes[r.id];
     return {
       id: r.id,
@@ -294,6 +346,7 @@
       firstDeparture: r.firstDeparture,
       lastDeparture: r.lastDeparture,
       runsOn: r.runsOn,
+      serviceOverrides: r.serviceOverrides || null,
       notes: r.notes
     };
   });

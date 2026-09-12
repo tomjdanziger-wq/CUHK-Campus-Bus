@@ -207,6 +207,32 @@
   // Autocomplete
   // =========================================================================
 
+  /**
+   * One-tap shortcuts for the trips someone makes every day.
+   *
+   * They set the field exactly as picking from the search results would, so
+   * nothing downstream needs to know they exist. Configured in
+   * `config.quickPicks` rather than hard-coded, since whose home this is
+   * depends on who is using it.
+   */
+  function renderQuickPicks(containerId, inputId, picks, onPick) {
+    var box = $(containerId);
+    box.innerHTML = '';
+    (picks || []).forEach(function (pick) {
+      var place = DATA.places.filter(function (p) { return p.id === pick.place; })[0];
+      if (!place) return;   // an id that no longer exists just disappears
+
+      var btn = el('button', 'quick__btn', pick.label || place.name);
+      btn.type = 'button';
+      btn.title = place.name + (place.nameZh ? ' ' + place.nameZh : '');
+      btn.addEventListener('click', function () {
+        $(inputId).value = place.name;
+        onPick(place);
+      });
+      box.appendChild(btn);
+    });
+  }
+
   function wireAutocomplete(inputId, listId, onPick) {
     var input = $(inputId);
     var list = $(listId);
@@ -1249,7 +1275,7 @@
   function init() {
     renderChrome();
 
-    wireAutocomplete('origin-input', 'origin-results', function (place) {
+    var pickOrigin = function (place) {
       state.origin = place;
       state.originSource = 'manual';
       state.originCorrected = true;
@@ -1257,15 +1283,21 @@
       setOriginStatus('Starting from ' + place.name + (place.nameZh ? ' ' + place.nameZh : '') + '.', 'ok');
       $('origin-confirm').hidden = true;
       recompute();
-    });
+    };
 
-    wireAutocomplete('dest-input', 'dest-results', function (place) {
+    var pickDestination = function (place) {
       state.destination = place;
       $('dest-status').textContent =
         'Going to ' + place.name + (place.nameZh ? ' ' + place.nameZh : '') + '.';
       $('dest-status').className = 'field__status field__status--ok';
       recompute();
-    });
+    };
+
+    wireAutocomplete('origin-input', 'origin-results', pickOrigin);
+    wireAutocomplete('dest-input', 'dest-results', pickDestination);
+
+    renderQuickPicks('origin-quick', 'origin-input', CFG.quickPicks && CFG.quickPicks.from, pickOrigin);
+    renderQuickPicks('dest-quick', 'dest-input', CFG.quickPicks && CFG.quickPicks.to, pickDestination);
 
     $('gps-btn').addEventListener('click', requestGps);
 

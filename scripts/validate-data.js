@@ -53,7 +53,8 @@ const served = new Set();
 for (const r of DATA.routes) {
   console.log(`${r.name}${r.label ? ' — ' + r.label : ''}  ` +
               `${r.firstDeparture}–${r.lastDeparture}  ` +
-              `at :${r.departureMinutes.join(', :')}  ${r.runsOn}`);
+              `at ${r.departureMinutes.map((m) => ':' + String(m).padStart(2, '0')).join(', ')}` +
+              `  ${r.runsOn}`);
 
   // 1 & 2 — stop ids resolve, and no immediate repeats.
   let ok = true;

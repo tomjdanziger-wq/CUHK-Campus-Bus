@@ -184,6 +184,23 @@ body {
 .icon-btn:active { background: var(--line); }
 .icon-btn[aria-pressed="true"] { color: var(--ink); border-color: var(--ink-2); }
 
+.quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.quick:empty { display: none; }
+.quick__btn {
+  min-height: var(--tap);
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.quick__btn:hover { color: var(--ink); border-color: var(--ink-2); }
+.quick__btn:active { background: var(--line); }
+
 .field__status {
   margin: 6px 0 0;
   font-size: 14px;

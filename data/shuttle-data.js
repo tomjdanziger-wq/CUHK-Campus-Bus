@@ -471,7 +471,9 @@
       lng: p.lng,
       elevation: p.elevation,
       source: 'osm',
-      stopId: null
+      stopId: null,
+      // Present only on places that sell food: { category, cuisine, hours }.
+      food: p.food || null
     };
   });
 

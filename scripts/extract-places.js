@@ -49,7 +49,9 @@ const OVERPASS_QUERY = `
 [out:json][timeout:90];
 (
   nwr["building"]["name"](${BBOX.join(',')});
-  nwr["amenity"~"^(college|university|library|hospital|clinic|restaurant|cafe|canteen|food_court|bank|pharmacy|post_office|theatre|arts_centre|sports_centre|swimming_pool|place_of_worship)$"]["name"](${BBOX.join(',')});
+  nwr["amenity"~"^(college|university|library|hospital|clinic|bank|pharmacy|post_office|theatre|arts_centre|sports_centre|swimming_pool|place_of_worship)$"]["name"](${BBOX.join(',')});
+  nwr["amenity"~"^(restaurant|cafe|fast_food|food_court|canteen|bar|pub|ice_cream|bakery)$"](${BBOX.join(',')});
+  nwr["shop"~"^(convenience|supermarket|bakery|coffee|deli)$"](${BBOX.join(',')});
   nwr["leisure"~"^(sports_centre|stadium|swimming_pool|pitch|fitness_centre)$"]["name"](${BBOX.join(',')});
   nwr["amenity"="university"]["name"](${BBOX.join(',')});
   nwr["office"]["name"](${BBOX.join(',')});
@@ -58,6 +60,15 @@ const OVERPASS_QUERY = `
 );
 out center tags;
 `;
+
+// Somewhere you can buy food. Kept as a category so the app can list them
+// without guessing from the name — "Café 12" and "Food Lab" are canteens,
+// "Gallant Place" is not, and no amount of string matching knows that.
+const FOOD_AMENITIES = new Set([
+  'restaurant', 'cafe', 'fast_food', 'food_court', 'canteen',
+  'bar', 'pub', 'ice_cream', 'bakery',
+]);
+const FOOD_SHOPS = new Set(['convenience', 'supermarket', 'bakery', 'coffee', 'deli']);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -169,6 +180,10 @@ function normalise(elements) {
     // Dedupe on name: OSM often has a building way AND an amenity node for the
     // same thing. Prefer whichever carries the most tags.
     const key = name.toLowerCase();
+    const category = FOOD_AMENITIES.has(tags.amenity) ? tags.amenity
+                   : FOOD_SHOPS.has(tags.shop) ? tags.shop
+                   : null;
+
     const cand = {
       id: slugify(name),
       name,
@@ -177,11 +192,22 @@ function normalise(elements) {
       lat: +lat.toFixed(6),
       lng: +lng.toFixed(6),
       elevation: null,
+      // Only carried for food places, to keep the shipped file small.
+      food: category ? {
+        category,
+        cuisine: tags.cuisine || null,
+        // OSM opening-hours syntax, e.g. "Mo-Fr 08:00-20:00; Sa 11:00-18:00".
+        hours: tags.opening_hours || null,
+      } : null,
       _score: Object.keys(tags).length,
       _osm: `${el.type}/${el.id}`,
     };
     const prev = byKey.get(key);
-    if (!prev || cand._score > prev._score) byKey.set(key, cand);
+    if (!prev) { byKey.set(key, cand); continue; }
+    // Prefer whichever entry knows it sells food; otherwise the richer one.
+    const better = (cand.food && !prev.food) ||
+                   (!!cand.food === !!prev.food && cand._score > prev._score);
+    if (better) byKey.set(key, cand);
   }
 
   // Ensure ids are unique after slugification.
@@ -231,7 +257,11 @@ async function fillElevations(places) {
 // ---------------------------------------------------------------------------
 
 function emit(places) {
-  const clean = places.map(({ _score, _osm, ...p }) => ({ ...p, osm: _osm }));
+  const clean = places.map(({ _score, _osm, food, ...p }) => {
+    const out = { ...p, osm: _osm };
+    if (food) out.food = food;     // omitted entirely for non-food places
+    return out;
+  });
   const body = clean
     .map((p) => '  ' + JSON.stringify(p).replace(/","/g, '", "'))
     .join(',\n');
@@ -259,7 +289,11 @@ ${body}
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 `;
   fs.writeFileSync(OUT_FILE, src);
-  process.stderr.write(`✓ wrote ${OUT_FILE} (${clean.length} places)\n`);
+  const food = clean.filter((p) => p.food).length;
+  const withHours = clean.filter((p) => p.food && p.food.hours).length;
+  process.stderr.write(
+    `✓ wrote ${OUT_FILE} (${clean.length} places, ${food} of them food, ` +
+    `${withHours} with opening hours)\n`);
 }
 
 // ---------------------------------------------------------------------------

@@ -35,7 +35,8 @@
     netMap: null,
     netLayer: null,
     netRoute: null,
-    netZoomBound: false
+    netZoomBound: false,
+    foodGroup: null
   };
 
 
@@ -1256,6 +1257,164 @@
     return runsOn;
   }
 
+
+  // =========================================================================
+  // Food browser
+  //
+  // Answers "where can I eat, and how far is it from here" without anyone
+  // having to know a canteen's official name or look the place up on a map
+  // somewhere else.
+  //
+  // Everything comes from OpenStreetMap's own categories rather than from
+  // matching words in names. "Café 12" and "Food Lab" are places to eat and
+  // "Gallant Place" is not, and no amount of string matching knows that.
+  // =========================================================================
+
+  var FOOD_GROUPS = [
+    { id: null,     label: 'All' },
+    { id: 'meal',   label: 'Canteens & restaurants',
+      match: ['restaurant', 'canteen', 'food_court', 'fast_food'] },
+    { id: 'cafe',   label: 'Cafés',  match: ['cafe'] },
+    { id: 'shop',   label: 'Shops',  match: ['convenience', 'supermarket', 'bakery', 'deli'] }
+  ];
+
+  var CATEGORY_LABELS = {
+    restaurant: 'Restaurant', canteen: 'Canteen', food_court: 'Food court',
+    fast_food: 'Fast food', cafe: 'Café', bar: 'Bar', pub: 'Pub',
+    ice_cream: 'Ice cream', bakery: 'Bakery', convenience: 'Convenience shop',
+    supermarket: 'Supermarket', deli: 'Deli', coffee: 'Coffee shop'
+  };
+
+  /**
+   * OpenStreetMap's opening-hours syntax, lightly humanised.
+   *
+   * Deliberately NOT parsed into an open/closed answer. Getting that wrong
+   * means telling somebody a canteen is open when it is not, and they walk up
+   * a hill for nothing. The raw published hours, made readable, say enough.
+   */
+  function readableHours(spec) {
+    return spec
+      .replace(/\bMo\b/g, 'Mon').replace(/\bTu\b/g, 'Tue').replace(/\bWe\b/g, 'Wed')
+      .replace(/\bTh\b/g, 'Thu').replace(/\bFr\b/g, 'Fri').replace(/\bSa\b/g, 'Sat')
+      .replace(/\bSu\b/g, 'Sun').replace(/\bPH\b/g, 'public holidays')
+      .replace(/\bSH\b/g, 'school holidays')
+      .replace(/\boff\b/g, 'closed')
+      .replace(/(\d)-(\d)/g, '$1–$2')
+      .replace(/;\s*/g, ' · ');
+  }
+
+  /** "↑ 44 m" / "↓ 30 m" / "level" — the gradient at a glance. */
+  function compactClimb(walk) {
+    var d = walk.deltaElevation;
+    if (Math.abs(d) < CFG.display.notableElevationMetres) return 'level';
+    return (d > 0 ? '↑ ' : '↓ ') + Math.abs(d) + ' m';
+  }
+
+  function wireFood() {
+    var toggle = $('food-toggle');
+    var panel = $('food-panel');
+
+    toggle.addEventListener('click', function () {
+      var open = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!open));
+      panel.hidden = open;
+      toggle.classList.toggle('is-open', !open);
+      if (!open) renderFood();
+    });
+
+    renderFoodChips();
+  }
+
+  function renderFoodChips() {
+    var box = $('food-chips');
+    box.innerHTML = '';
+    FOOD_GROUPS.forEach(function (g) {
+      var b = el('button', 'chip');
+      b.type = 'button';
+      b.textContent = g.label;
+      b.setAttribute('aria-pressed', String(state.foodGroup === g.id));
+      b.addEventListener('click', function () {
+        state.foodGroup = g.id;
+        renderFoodChips();
+        renderFood();
+      });
+      box.appendChild(b);
+    });
+  }
+
+  function renderFood() {
+    var list = $('food-list');
+    var note = $('food-note');
+    list.innerHTML = '';
+
+    var group = FOOD_GROUPS.filter(function (g) { return g.id === state.foodGroup; })[0];
+    var places = DATA.places.filter(function (p) {
+      if (!p.food) return false;
+      return !group || !group.match || group.match.indexOf(p.food.category) !== -1;
+    });
+
+    // Sorted by how far it is, when we know where the user is standing.
+    var from = state.origin;
+    if (from) {
+      places = places.map(function (p) {
+        return { place: p, walk: geo.walk(from, p, CFG) };
+      }).sort(function (a, b) { return a.walk.minutes - b.walk.minutes; });
+      note.textContent = places.length + ' places, nearest to ' + from.name + ' first. ' +
+        'Tap one to plan the trip.';
+    } else {
+      places = places.map(function (p) { return { place: p, walk: null }; })
+        .sort(function (a, b) { return a.place.name.localeCompare(b.place.name); });
+      note.textContent = places.length + ' places, alphabetically — set a starting ' +
+        'point above and they sort by how far away they are.';
+    }
+
+    places.forEach(function (entry) {
+      var p = entry.place;
+      var li = el('li', 'foodlist__item');
+
+      var btn = el('button', 'foodlist__btn');
+      btn.type = 'button';
+
+      var main = el('span', 'foodlist__main');
+      main.appendChild(el('span', 'foodlist__name', p.name));
+
+      var sub = [];
+      // Some OSM entries repeat the English name in the Chinese field.
+      if (p.nameZh && p.nameZh !== p.name) sub.push(p.nameZh);
+      sub.push(CATEGORY_LABELS[p.food.category] || p.food.category);
+      if (p.food.cuisine) sub.push(p.food.cuisine.replace(/[_;]/g, ' '));
+      main.appendChild(el('span', 'foodlist__sub', sub.join(' · ')));
+
+      main.appendChild(el('span', 'foodlist__hours',
+        p.food.hours ? readableHours(p.food.hours) : 'Opening hours not published'));
+      if (!p.food.hours) main.lastChild.classList.add('foodlist__hours--unknown');
+
+      btn.appendChild(main);
+
+      if (entry.walk) {
+        var dist = el('span', 'foodlist__dist');
+        dist.appendChild(el('strong', null, formatLeg(entry.walk.minutes)));
+        // Compact here, not the prose used on option cards: this is a long
+        // list and the wording pushed every name into three wrapped lines.
+        dist.appendChild(el('span', null, compactClimb(entry.walk)));
+        btn.appendChild(dist);
+      }
+
+      btn.addEventListener('click', function () {
+        $('dest-input').value = p.name;
+        state.destination = p;
+        $('dest-status').textContent =
+          'Going to ' + p.name + (p.nameZh ? ' ' + p.nameZh : '') + '.';
+        $('dest-status').className = 'field__status field__status--ok';
+        recompute();
+        $('results-section').scrollIntoView({ block: 'start' });
+      });
+
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
+  }
+
   // =========================================================================
   // Wiring
   // =========================================================================
@@ -1325,6 +1484,7 @@
     });
 
     wireNetwork();
+    wireFood();
 
     // Waits count down in real time, so a stale screen is a wrong screen.
     setInterval(function () { if (!state.when) render(); }, 30000);

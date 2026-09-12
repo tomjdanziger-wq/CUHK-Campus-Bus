@@ -760,3 +760,46 @@ body {
   :root { --gutter: 28px; }
   .header h1 { font-size: 32px; }
 }
+
+/* --- food browser -------------------------------------------------------- */
+
+.foodlist { list-style: none; margin: 14px 0 0; padding: 0; }
+.foodlist__item + .foodlist__item { border-top: 1px solid var(--line); }
+
+.foodlist__btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 11px 0;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.foodlist__btn:hover { background: var(--surface-2); }
+
+.foodlist__main { flex: 1; min-width: 0; }
+.foodlist__name { display: block; font-size: 15.5px; font-weight: 500; }
+.foodlist__sub  { display: block; font-size: 13.5px; color: var(--ink-3); margin-top: 1px; }
+.foodlist__hours {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-top: 3px;
+}
+/* Said plainly rather than left blank: not knowing is information too. */
+.foodlist__hours--unknown { color: var(--ink-3); font-style: italic; }
+
+.foodlist__dist {
+  flex-shrink: 0;
+  width: 62px;
+  text-align: right;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.foodlist__dist strong { display: block; font-size: 15px; color: var(--ink); font-weight: 600; }

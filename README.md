@@ -480,6 +480,41 @@ Stop codes live in the `abbr` field of each stop in `data/shuttle-data.js`. On a
 campus-wide view the labels collapse to dots — twenty-nine of them at that zoom
 overlap into an unreadable pile — and reappear when you select a route or zoom in.
 
+## Places to eat
+
+**Places to eat** lists every canteen, café, restaurant and food shop on campus
+— 72 of them — sorted by how far they are from wherever you have said you are,
+with the walk and the climb. Tap one and it becomes your destination.
+
+The point is not to replace a restaurant guide. It is that finding a canteen
+should not mean leaving the app, looking the name up on a map somewhere else,
+and coming back.
+
+They are identified by **OpenStreetMap's own categories**, not by matching words
+in names. Matching words finds "Student Canteen" and misses "Café 12", "Food
+Lab" and "The Harmony", while happily picking up anything with "Kitchen" in the
+name that is not a kitchen. `scripts/extract-places.js` now stores a `food`
+block — category, cuisine and opening hours — on the places that have one, and
+nothing at all on the places that do not, which keeps the shipped file small.
+
+### On opening hours
+
+Only **14 of the 72** have published hours, and they come from OpenStreetMap.
+
+The University's Finance Office publishes authoritative hours, but only for the
+ten centrally-run outlets, and only as a PDF whose text sits inside Form
+XObjects that the extractor in `scripts/_pdfpos.py` does not recurse into — so
+half the times came out missing and the page footer came out looking like a
+canteen. College canteens are published on each college's own website in a
+different format every time. Neither is currently wired in.
+
+Where hours are known they are shown as published text, lightly humanised
+(`Mo-Su 07:30-21:00` → `Mon–Sun 07:30–21:00`). They are deliberately **not**
+parsed into an "open now" badge. Getting that wrong means telling somebody a
+canteen is open when it is closed and sending them up a hill for nothing, and a
+badge that is right most of the time is worse than a line of text that is always
+right. Where hours are not known, the card says so rather than leaving a gap.
+
 ## Searching
 
 Fuzzy matching runs over English names, Chinese names and hand-written aliases,

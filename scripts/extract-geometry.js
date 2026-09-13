@@ -343,6 +343,61 @@ function routeShapes(ways) {
 // Walking graph
 // ---------------------------------------------------------------------------
 
+// Two paths that visibly meet on the map but were drawn without a shared node
+// are, to a router, on different planets. OSM on this campus has a handful of
+// these — The Stage, Li's Ancestral Hall, the geography station — each a few
+// metres off the main network, which made every walk to them unroutable.
+// Join any island whose closest node lies within this distance of another
+// part of the network. Keep it small: a bridge over a road is also "close".
+const STITCH_M = 6;
+
+function stitchIslands(coords, edges) {
+  const n = coords.length;
+  const adj = Array.from({ length: n }, () => []);
+  for (let i = 0; i < edges.length; i += 2) {
+    adj[edges[i]].push(edges[i + 1]);
+    adj[edges[i + 1]].push(edges[i]);
+  }
+
+  const comp = new Int32Array(n).fill(-1);
+  const members = [];
+  for (let i = 0; i < n; i++) {
+    if (comp[i] >= 0) continue;
+    const c = members.length, list = [i], stack = [i];
+    comp[i] = c;
+    while (stack.length) {
+      for (const v of adj[stack.pop()]) {
+        if (comp[v] < 0) { comp[v] = c; list.push(v); stack.push(v); }
+      }
+    }
+    members.push(list);
+  }
+
+  let joined = 0;
+  // Smallest islands first, each to its nearest node in any other component.
+  const order = members.map((m, c) => c).sort((a, b) => members[a].length - members[b].length);
+  for (const c of order.slice(0, -1)) {
+    let best = Infinity, bu = -1, bv = -1;
+    for (const u of members[c]) {
+      for (let v = 0; v < n; v++) {
+        if (comp[v] === c) continue;
+        if (Math.abs(coords[u][0] - coords[v][0]) > 0.0001) continue;
+        const d = haversine(coords[u], coords[v]);
+        if (d < best) { best = d; bu = u; bv = v; }
+      }
+    }
+    if (best > STITCH_M) continue;
+    edges.push(bu, bv);
+    // Fold this island into the one it joined so later islands see it.
+    const into = comp[bv];
+    for (const u of members[c]) comp[u] = into;
+    members[into] = members[into].concat(members[c]);
+    members[c] = [];
+    joined++;
+  }
+  return joined;
+}
+
 function walkGraph(ways) {
   const g = buildGraph(ways, WALKABLE, { directed: false });
 
@@ -370,7 +425,10 @@ function walkGraph(ways) {
     }
   }
 
-  process.stderr.write(`  walk graph: ${coords.length} nodes, ${edges.length / 2} edges\n`);
+  const stitched = stitchIslands(coords, edges);
+
+  process.stderr.write(`  walk graph: ${coords.length} nodes, ${edges.length / 2} edges ` +
+    `(${stitched} near-miss gaps joined)\n`);
 
   // Integers scaled by 1e6 — about half the characters of decimal strings, and
   // 1e-6 degrees is ~0.1 m, far finer than anything here needs.

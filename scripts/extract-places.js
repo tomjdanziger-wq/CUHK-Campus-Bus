@@ -12,7 +12,7 @@
  * its terms restrict storing results, which would force live API calls forever.
  * OSM is ODbL — attribution is rendered in the app footer.
  *
- * Usage:  node scripts/extract-places.js [--dry]
+ * Usage:  node scripts/extract-places.js [--dry] [--refilter]
  */
 
 'use strict';
@@ -253,6 +253,79 @@ async function fillElevations(places) {
 }
 
 // ---------------------------------------------------------------------------
+// Step 3b — keep what is actually on campus
+// ---------------------------------------------------------------------------
+
+// The bounding box is a rectangle and the campus is not. Before this filter,
+// 363 of 570 "places" were Science Park towers, Fo Tan housing estates and
+// village houses in Cheung Shue Tan: unreachable on campus footpaths, and
+// noise in search — "Block 6" of some estate sitting next to I House Block 6.
+//
+// So a place stays if it is inside the university's own OSM boundary, or close
+// enough to a shuttle stop that someone would plausibly walk there from one
+// (the shops in University Station are just outside the boundary line), or it
+// is a CUHK facility that happens to sit off the main campus.
+const CAMPUS_RELATION = 7802779;   // 香港中文大學 The Chinese University of Hong Kong
+const CAMPUS_CACHE = path.join(__dirname, '..', '.overpass-campus.json');
+const NEAR_STOP_M = 150;
+const CUHK_FACILITY = /CUHK|Chinese University|Vice-Chancellor/i;
+
+async function fetchCampusBoundary() {
+  if (fs.existsSync(CAMPUS_CACHE)) {
+    process.stderr.write(`→ using cached ${path.basename(CAMPUS_CACHE)}\n`);
+    return JSON.parse(fs.readFileSync(CAMPUS_CACHE, 'utf8'));
+  }
+  let lastErr;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      process.stderr.write(`→ campus boundary: ${endpoint}\n`);
+      const json = await postJson(endpoint, {
+        contentType: 'application/x-www-form-urlencoded',
+        body: 'data=' + encodeURIComponent(`[out:json][timeout:120];relation(${CAMPUS_RELATION});out geom;`),
+      }, 'Overpass');
+      fs.writeFileSync(CAMPUS_CACHE, JSON.stringify(json));
+      return json;
+    } catch (err) {
+      process.stderr.write(`  failed: ${err.message}\n`);
+      lastErr = err;
+    }
+  }
+  throw lastErr;
+}
+
+function keepOnCampus(places, boundary) {
+  // Even-odd ray casting over every member way's segments. The multipolygon's
+  // ways are not assembled into rings first, and do not need to be: as long as
+  // they close (they do), each crossing flips inside/outside all the same, and
+  // inner rings — holes — fall out of the parity for free.
+  const segs = [];
+  for (const m of boundary.elements[0].members) {
+    const g = m.geometry || [];
+    for (let i = 1; i < g.length; i++) segs.push([g[i - 1], g[i]]);
+  }
+  const inside = (lat, lng) => {
+    let c = false;
+    for (const [a, b] of segs) {
+      if ((a.lat > lat) !== (b.lat > lat) &&
+          lng < a.lon + (lat - a.lat) * (b.lon - a.lon) / (b.lat - a.lat)) c = !c;
+    }
+    return c;
+  };
+
+  // Stop coordinates come from the hand-maintained data file.
+  require('../data/routes.generated.js');
+  require('../data/shuttle-data.js');
+  const stops = globalThis.SHUTTLE_DATA.stops;
+  const nearStop = (p) => stops.some((s) =>
+    Math.hypot((s.lat - p.lat) * 111320, (s.lng - p.lng) * 103000) <= NEAR_STOP_M);
+
+  const kept = places.filter((p) =>
+    inside(p.lat, p.lng) || nearStop(p) || CUHK_FACILITY.test(p.name));
+  process.stderr.write(`  ${kept.length} of ${places.length} places are on or next to campus\n`);
+  return kept;
+}
+
+// ---------------------------------------------------------------------------
 // Step 4 — emit
 // ---------------------------------------------------------------------------
 
@@ -299,8 +372,19 @@ ${body}
 // ---------------------------------------------------------------------------
 
 async function main() {
+  const boundary = await fetchCampusBoundary();
+
+  // --refilter re-applies the campus filter to the shipped file without
+  // re-querying Overpass or re-fetching every elevation.
+  if (process.argv.includes('--refilter')) {
+    require(OUT_FILE);
+    const existing = globalThis.CUHK_PLACES_GENERATED.map(({ osm, ...p }) => ({ ...p, _osm: osm }));
+    emit(keepOnCampus(existing, boundary));
+    return;
+  }
+
   const elements = await fetchOverpass();
-  const places = normalise(elements);
+  const places = keepOnCampus(normalise(elements), boundary);
   process.stderr.write(`  ${places.length} named places after dedupe\n`);
   if (!process.argv.includes('--dry')) await fillElevations(places);
   emit(places);

@@ -4,3 +4,6 @@ __pycache__/
 
 # Cached Overpass reply for scripts/extract-geometry.js — 1.2 MB, regenerable.
 .overpass-roads.json
+
+# Cached CUHK campus boundary for scripts/extract-places.js — regenerable.
+.overpass-campus.json

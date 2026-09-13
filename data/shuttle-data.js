@@ -73,20 +73,23 @@
       // Straight-line distance is multiplied by this to approximate the real
       // path network (stairs, switchbacks, walking round buildings).
       //
-      // MEASURED, not guessed. Routing 2,739 building-to-stop legs over the
+      // MEASURED, not guessed. Routing 1,937 building-to-stop legs over the
       // campus footpath network in data/shapes.generated.js gives a ratio of
       // routed distance to straight-line distance of:
       //
-      //     p10 1.28   p25 1.43   median 1.69   p75 2.12   p90 2.63
+      //     p10 1.18   p25 1.29   median 1.46   p75 1.72   p90 2.06
       //
-      // This started at a guessed 1.3, which underestimated every walk on
-      // campus by about 30%. 1.65 sits just under the measured median, on the
-      // grounds that OpenStreetMap does not map every covered walkway, podium
-      // shortcut and lift, so the router detours where a person would not.
+      // History, because both earlier values were wrong for instructive
+      // reasons. A guessed 1.3 underestimated every walk by about 30%. A first
+      // measurement gave 1.69, but a third of its sample were Science Park
+      // towers and Fo Tan housing estates outside campus, reached by absurd
+      // detours, and every walk snapped to the single nearest footpath node —
+      // often a dead-end stub. With places clipped to the campus boundary and
+      // the router choosing among nearby entry points, the median is 1.46.
       //
       // Re-measure after changing the footpath data:
       //   node scripts/calibrate-walk.js
-      detourFactor: 1.65,
+      detourFactor: 1.45,
 
       // Tobler's hiking function:  v = 6 · exp(−3.5 · |slope + 0.05|)  km/h
       // It peaks at a gentle −5% downhill and falls off steeply uphill, which

@@ -22,7 +22,7 @@
  *   sometimes detours where a person would not.
  *
  *   Do NOT route every leg at runtime instead. It would mean tens of Dijkstra
- *   runs per search on a phone, and 30% of legs fail to snap to a path at all,
+ *   runs per search on a phone, and a few percent of legs still find no sensible path,
  *   which would leave the app mixing two different methods in one ranked list.
  *   A single measured constant keeps the method uniform and the numbers cheap.
  */
@@ -59,7 +59,7 @@ const MIN_M = 60, MAX_M = 1200, STRIDE = 3, ABSURD_RATIO = 4;
 
 const ratios = [];
 const bands = { '60–250 m': [], '250–600 m': [], '600–1200 m': [] };
-let tried = 0, unroutable = 0;
+let tried = 0, unroutable = 0, fellBack = 0;
 
 for (const stop of DATA.stops) {
   for (let i = 0; i < places.length; i += STRIDE) {
@@ -70,6 +70,12 @@ for (const stop of DATA.stops) {
 
     const routed = router.route(stop, p);
     if (!routed) { unroutable++; continue; }
+
+    // The router falls back to a straight line when it cannot find a sensible
+    // path. That is a failure, not a measurement of one — counting it as a
+    // ratio of exactly 1.00 would drag the median down and make the campus
+    // look flatter and better connected than it is.
+    if (routed.straightLine) { fellBack++; continue; }
 
     const ratio = routed.metres / straight;
     if (ratio > ABSURD_RATIO) continue;   // disconnected corner of the graph
@@ -89,7 +95,9 @@ const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
 console.log(`Sampled ${tried} building-to-stop legs.`);
 console.log(`  routed:     ${ratios.length}`);
 console.log(`  unroutable: ${unroutable} (${(100 * unroutable / tried).toFixed(0)}% — ` +
-            `no footpath within the snap limit)\n`);
+            `no footpath within the snap limit)`);
+console.log(`  fell back:  ${fellBack} (${(100 * fellBack / tried).toFixed(0)}% — ` +
+            `no sensible path found; excluded from the measurement)\n`);
 
 console.log('Ratio of routed distance to straight-line distance:');
 console.log(`  p10 ${q(ratios, 0.1).toFixed(2)}   p25 ${q(ratios, 0.25).toFixed(2)}   ` +

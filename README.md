@@ -232,14 +232,13 @@ Google Places is deliberately not used: it needs a key and billing, and its term
 No routing API. From `lib/geo.js`:
 
 1. Haversine distance between the two points.
-2. Multiplied by `config.walking.detourFactor` (**1.65**) to approximate the real
+2. Multiplied by `config.walking.detourFactor` (**1.45**) to approximate the real
    path network. This is measured, not guessed: `scripts/calibrate-walk.js`
-   routes 2,739 building-to-stop legs over the campus footpath network and
-   reports the ratio of routed to straight-line distance — p25 1.43, **median
-   1.69**, p75 2.12. It started life as a guessed 1.3, which underestimated
-   every walk on campus by about 30%. 1.65 sits just under the median, because
-   OpenStreetMap does not map every covered walkway, podium shortcut and lift,
-   so the router detours where a person would not.
+   routes ~1,900 building-to-stop legs over the campus footpath network and
+   reports the ratio of routed to straight-line distance — p25 1.29, **median
+   1.46**, p75 1.72. It started as a guessed 1.3 (walks ~30% short), then a first
+   measurement of 1.69 that was skewed by off-campus places and by snapping to
+   dead-end footpath stubs.
 3. Converted to time by **Tobler's hiking function**, `v = 6 · exp(−3.5 · |slope + 0.05|)` km/h, using the average gradient. It peaks at a gentle downhill and falls off sharply uphill, which matches how this campus actually feels. Scaled by `toblerCalibration` (0.85) to a realistic student pace — about 4.3 km/h on the flat.
 4. Widened into a range (`rangeLow` 0.8, `rangeHigh` 1.35). Asymmetric, because these estimates fail long far more often than short.
 

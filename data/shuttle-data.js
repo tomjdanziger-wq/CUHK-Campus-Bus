@@ -193,6 +193,16 @@
     // One-tap shortcuts under the From and To boxes, for the trips you make
     // every day. `place` is an id from the merged places list — either a
     // generated OSM id, or 'stop:<stop id>' for a shuttle stop.
+    // "Last bus home". Shown on the trip page before a destination is chosen,
+    // and for whatever destination is chosen once there is one.
+    lastBus: {
+      home: { place: 'university-residence-nos-3', label: 'I House 6' },
+      // How far from the destination a bus may drop you and still count as
+      // getting you there. Deliberately tighter than
+      // search.maxWalkFromStopMinutes: this is the walk at midnight.
+      maxWalkFromStopMinutes: 8
+    },
+
     quickPicks: {
       from: [
         { place: 'university-residence-nos-3', label: 'I House 6' }

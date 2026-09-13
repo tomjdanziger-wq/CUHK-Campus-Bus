@@ -17,151 +17,129 @@
   <span id="placeholder-banner-text"></span>
 </div>
 
-<!-- Shown while ride times between stops are estimated rather than published. -->
-<div id="estimate-banner" class="banner banner--warn" hidden>
-  <span id="estimate-banner-text"></span>
+<!-- Three pages side by side: swipe right for the route map, left for food.
+     The tabs say where you are and work for anyone who cannot swipe. -->
+<nav class="tabs" role="tablist" aria-label="Sections">
+  <button id="tab-routes" class="tabs__tab" type="button" role="tab" data-page="0"
+          aria-controls="page-routes" aria-selected="false">Routes</button>
+  <button id="tab-trip" class="tabs__tab" type="button" role="tab" data-page="1"
+          aria-controls="page-trip" aria-selected="true">Walk or bus</button>
+  <button id="tab-food" class="tabs__tab" type="button" role="tab" data-page="2"
+          aria-controls="page-food" aria-selected="false">Food</button>
+</nav>
+
+<div id="pager" class="pager">
+
+  <!-- ---------------------------------------------------------------- -->
+  <!-- Routes: every route and stop, for when you would rather pick the  -->
+  <!-- bus yourself than describe a journey.                             -->
+  <!-- ---------------------------------------------------------------- -->
+  <section id="page-routes" class="page" role="tabpanel" aria-labelledby="tab-routes">
+    <div id="network-chips" class="chips" role="group" aria-label="Choose a route"></div>
+    <div id="network-map" class="map map--network" role="img"
+         aria-label="Map of the shuttle network"></div>
+    <p id="network-summary" class="network__summary"></p>
+    <ol id="network-stops" class="stoplist"></ol>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <!-- Trip                                                              -->
+  <!-- ---------------------------------------------------------------- -->
+  <section id="page-trip" class="page" role="tabpanel" aria-labelledby="tab-trip">
+
+    <section class="trip" aria-label="Choose your trip">
+      <div class="field">
+        <div class="field__head">
+          <label class="field__label" for="origin-input">From</label>
+          <div id="origin-quick" class="quick" role="group" aria-label="Quick start points"></div>
+        </div>
+        <div class="field__row">
+          <input id="origin-input" class="input" type="search" autocomplete="off"
+                 placeholder="Building, or use GPS"
+                 aria-describedby="origin-status" aria-autocomplete="list" role="combobox"
+                 aria-expanded="false" aria-controls="origin-results">
+          <button id="gps-btn" class="icon-btn" type="button" title="Use my location"
+                  aria-label="Use my current location">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A9 9 0 0 0 13 3.06V1h-2v2.06A9 9 0 0 0 3.06 11H1v2h2.06A9 9 0 0 0 11 20.94V23h2v-2.06A9 9 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/></svg>
+          </button>
+        </div>
+        <ul id="origin-results" class="results" role="listbox" hidden></ul>
+        <p id="origin-status" class="field__status" role="status"></p>
+        <div id="origin-confirm" class="confirm" hidden>
+          <p class="confirm__q">GPS on campus is unreliable. Nearest stop to you:</p>
+          <div id="origin-confirm-list" class="confirm__list"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field__head">
+          <label class="field__label" for="dest-input">To</label>
+          <div id="dest-quick" class="quick" role="group" aria-label="Quick destinations"></div>
+        </div>
+        <div class="field__row">
+          <input id="dest-input" class="input" type="search" autocomplete="off"
+                 placeholder="e.g. United College, 科學館, canteen"
+                 aria-autocomplete="list" role="combobox" aria-expanded="false"
+                 aria-controls="dest-results">
+          <button id="swap-btn" class="icon-btn" type="button" title="Swap"
+                  aria-label="Swap origin and destination">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3 5 6.99h3V14h2V6.99h3L9 3z"/></svg>
+          </button>
+        </div>
+        <ul id="dest-results" class="results" role="listbox" hidden></ul>
+        <p id="dest-status" class="field__status" role="status"></p>
+      </div>
+
+      <div class="when">
+        <label class="when__label" for="when-input">Leaving</label>
+        <input id="when-input" class="when__input" type="time" aria-label="Departure time">
+        <button id="now-btn" class="when__now" type="button">Now</button>
+      </div>
+    </section>
+
+    <section id="results-section" aria-label="Your options" aria-live="polite">
+      <div id="options"></div>
+    </section>
+
+    <!-- The last bus of the day. For the chosen destination once there is
+         one, and for home before that. -->
+    <section id="lastbus" class="lastbus" aria-label="Last buses" hidden></section>
+
+    <footer class="footer">
+      <p id="validity" class="footer__validity"></p>
+      <p class="footer__note">
+        No live tracking. Every departure shown is a <strong>scheduled</strong> time, and
+        buses run late. Waits are the real gap to the next departure, not an average.
+        <span id="estimate-note"></span>
+        Walking times assume an unhurried pace and account for the hills, but not for
+        stairs, crowds or rain.
+      </p>
+      <p id="attribution" class="footer__attr"></p>
+    </footer>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <!-- Food: where to eat, and how far it is from where you are.         -->
+  <!-- ---------------------------------------------------------------- -->
+  <section id="page-food" class="page" role="tabpanel" aria-labelledby="tab-food">
+    <div id="food-chips" class="chips" role="group" aria-label="Filter by kind"></div>
+    <p id="food-note" class="network__summary"></p>
+    <ul id="food-list" class="foodlist"></ul>
+  </section>
+
 </div>
 
-<header class="header">
-  <h1>Walk or shuttle?</h1>
-  <p class="header__sub">Times are estimates. You decide.</p>
-</header>
-
-<main class="wrap">
-
-  <!-- ------------------------------------------------------------------ -->
-  <!-- Trip inputs                                                        -->
-  <!-- ------------------------------------------------------------------ -->
-  <section class="trip" aria-label="Choose your trip">
-
-    <div class="field">
-      <label class="field__label" for="origin-input">From</label>
-      <div class="field__row">
-        <input id="origin-input" class="input" type="search" autocomplete="off"
-               placeholder="Search a building, or use GPS"
-               aria-describedby="origin-status" aria-autocomplete="list" role="combobox"
-               aria-expanded="false" aria-controls="origin-results">
-        <button id="gps-btn" class="icon-btn" type="button" title="Use my location"
-                aria-label="Use my current location">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A9 9 0 0 0 13 3.06V1h-2v2.06A9 9 0 0 0 3.06 11H1v2h2.06A9 9 0 0 0 11 20.94V23h2v-2.06A9 9 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/></svg>
-        </button>
-      </div>
-      <ul id="origin-results" class="results" role="listbox" hidden></ul>
-      <div id="origin-quick" class="quick" role="group" aria-label="Quick start points"></div>
-      <p id="origin-status" class="field__status" role="status"></p>
-      <div id="origin-confirm" class="confirm" hidden>
-        <p class="confirm__q">GPS on campus is unreliable. Nearest stop to you:</p>
-        <div id="origin-confirm-list" class="confirm__list"></div>
-      </div>
-    </div>
-
-    <button id="swap-btn" class="swap" type="button" aria-label="Swap origin and destination">
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>
-      <span>Swap</span>
-    </button>
-
-    <div class="field">
-      <label class="field__label" for="dest-input">To</label>
-      <div class="field__row">
-        <input id="dest-input" class="input" type="search" autocomplete="off"
-               placeholder="e.g. United College, 科學館, YIA"
-               aria-autocomplete="list" role="combobox" aria-expanded="false"
-               aria-controls="dest-results">
-      </div>
-      <ul id="dest-results" class="results" role="listbox" hidden></ul>
-      <div id="dest-quick" class="quick" role="group" aria-label="Quick destinations"></div>
-      <p id="dest-status" class="field__status" role="status"></p>
-    </div>
-
-    <div class="when">
-      <label class="when__label" for="when-input">Leaving</label>
-      <input id="when-input" class="when__input" type="time" aria-label="Departure time">
-      <button id="now-btn" class="when__now" type="button">Now</button>
-    </div>
-  </section>
-
-  <!-- ------------------------------------------------------------------ -->
-  <!-- Network browser — every route and stop, for when you would rather   -->
-  <!-- pick the bus yourself than describe a journey.                      -->
-  <!-- ------------------------------------------------------------------ -->
-  <section class="network" aria-label="Browse all routes and stops">
-    <button id="network-toggle" class="network__toggle" type="button" aria-expanded="false"
-            aria-controls="network-panel">
-      <svg class="network__toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
-      <span>
-        <strong>All routes &amp; stops</strong>
-        <small>Where each shuttle goes, and which way round</small>
-      </span>
-      <svg class="network__chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
-    </button>
-
-    <div id="network-panel" class="network__panel" hidden>
-      <div id="network-chips" class="chips" role="group" aria-label="Choose a route"></div>
-      <div id="network-map" class="map map--network" role="img"
-           aria-label="Map of the shuttle network"></div>
-      <p id="network-summary" class="network__summary"></p>
-      <ol id="network-stops" class="stoplist"></ol>
-    </div>
-  </section>
-
-  <!-- ------------------------------------------------------------------ -->
-  <!-- Food browser — where to eat, and how far it is from where you are.  -->
-  <!-- ------------------------------------------------------------------ -->
-  <section class="network" aria-label="Places to eat">
-    <button id="food-toggle" class="network__toggle" type="button" aria-expanded="false"
-            aria-controls="food-panel">
-      <svg class="network__toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg>
-      <span>
-        <strong>Places to eat</strong>
-        <small id="food-subtitle">Canteens, cafés and shops, nearest first</small>
-      </span>
-      <svg class="network__chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z"/></svg>
-    </button>
-
-    <div id="food-panel" class="network__panel" hidden>
-      <div id="food-chips" class="chips" role="group" aria-label="Filter by kind"></div>
-      <p id="food-note" class="network__summary"></p>
-      <ul id="food-list" class="foodlist"></ul>
-    </div>
-  </section>
-
-  <!-- ------------------------------------------------------------------ -->
-  <!-- Results                                                            -->
-  <!-- ------------------------------------------------------------------ -->
-  <section id="results-section" aria-label="Your options" aria-live="polite">
-    <div id="empty-state" class="empty">
-      <p>Where are you going?</p>
-      <p class="empty__hint">Walking is always shown, even when it's slower.</p>
-    </div>
-    <div id="options"></div>
-  </section>
-
-  <!-- ------------------------------------------------------------------ -->
-  <!-- Map. Illustrative only — the written instructions are the product.  -->
-  <!-- This panel is moved into whichever option is being shown, so the    -->
-  <!-- map opens directly beneath the card it belongs to.                  -->
-  <!-- ------------------------------------------------------------------ -->
-  <div id="map-panel" class="map-panel" hidden>
-    <div id="map" class="map" role="img"
-         aria-label="Illustrative map of the selected option"></div>
-    <div id="map-legend" class="legend"></div>
-    <p id="map-note" class="map-note">
-      Illustrative. The written instructions above are the accurate part.
-    </p>
-  </div>
-
-  <footer class="footer">
-    <p id="validity" class="footer__validity"></p>
-    <p class="footer__note">
-      No live tracking. Every departure shown is a <strong>scheduled</strong> time, and
-      buses run late. Waits are the real gap to the next departure, not an average.
-      Walking times assume an unhurried pace and account for the hills, but not for
-      stairs, crowds or rain.
-    </p>
-    <p id="attribution" class="footer__attr"></p>
-  </footer>
-
-</main>
+<!-- Map. Illustrative only — the written instructions are the product. This
+     panel is moved into whichever option is being shown, so the map opens
+     directly beneath the card it belongs to. -->
+<div id="map-panel" class="map-panel" hidden>
+  <div id="map" class="map" role="img"
+       aria-label="Illustrative map of the selected option"></div>
+  <div id="map-legend" class="legend"></div>
+  <p id="map-note" class="map-note">
+    Illustrative. The written instructions above are the accurate part.
+  </p>
+</div>
 
 <!-- Data first, then logic, then the app. Plain scripts — no build step, and
      it works straight off the filesystem as well as from a server. -->

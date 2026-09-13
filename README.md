@@ -19,7 +19,7 @@ from OpenStreetMap's mapped CUHK shuttle stops; elevations from SRTM 30 m.
 |---|---|
 | Departure times, stop order, service days | Published. Real. |
 | Stop positions, elevations | Real (OSM + SRTM). |
-| **Time spent on the bus between stops** | **Estimated from distance and gradient.** CUHK does not publish running times. An amber banner says this, and every ride leg is labelled "ride time estimated from distance". |
+| **Time spent on the bus between stops** | **Estimated from distance and gradient.** CUHK does not publish running times. The footer says this, and every ride leg is labelled "ride time estimated from distance". |
 | **Peak-period capacity warnings** | **Guesses**, not measured. Configured in `config.peakPeriods`. |
 
 Ride-time estimates are the largest error source in the app. If you time the
@@ -315,7 +315,7 @@ These mattered more than features, so each one is enforced in a named place rath
 | "Scheduled" language throughout; no real-time claims | copy in `index.html` and the leg rows |
 | GPS guess always stated and correctable in one tap | `renderOriginConfirmation`, `app.js` |
 | Tight connections flagged rather than hidden inside the range | `isTight`, `lib/planner.js` |
-| Estimated ride times labelled as estimated, on every leg and in a banner | `meta.rideTimesEstimated`, `renderShuttleCard` |
+| Estimated ride times labelled as estimated, on every leg and in the footer | `meta.rideTimesEstimated`, `renderShuttleCard` |
 | Boarding on the wrong side of the road flagged in red, not quietly ranked last | `flagLongWayRound`, `lib/planner.js` |
 
 The last one is not in the original spec and was added because the numbers demanded it: the total assumes you catch the bus, so when the slow end of the walking estimate lands after the departure, the range is quietly optimistic in a way the user cannot see. The card now says so and names the fallback departure.
@@ -457,9 +457,34 @@ reasoning instead of just asserting the answer.
 On the map the continuation is drawn in the route's colour as a long dash, with
 hollow markers at those stops: context, visibly not the recommendation.
 
+## The last bus
+
+Late in the evening the question stops being "what should I do now?" and
+becomes "how late can I leave it?". The trip page answers that directly:
+**Last bus to I House 6** before anything is entered, and **Last bus to**
+wherever you are going once you have chosen a destination.
+
+For each route that runs today and drops you within
+`config.lastBus.maxWalkFromStopMinutes` (8) of the destination, it shows the
+final scheduled departure — from the best stop near your starting point if you
+have given one, otherwise from the route's first stop. Latest first, so the
+Night Service leads. Buses you can no longer reach are dropped, and if all of
+them have gone it says so in red. One more line gives the last bus on the
+*other* timetable (Sundays and public holidays, or the weekday one), since the
+time you need is often tomorrow's.
+
+The home is `config.lastBus.home` in `data/shuttle-data.js`. The logic is
+`planner.lastRides()`.
+
 ## Browsing the network
 
-The planner answers "how do I get from A to B". **Browse all routes & stops**
+The app is three pages side by side — **Routes**, **Walk or bus**, **Food** —
+with the trip planner in the middle. Swipe right for the route map, left for
+food, or tap the tabs. It is one horizontal scroller with CSS scroll snapping,
+so the swipe is the browser's own gesture, and each page keeps its own scroll
+position. Nothing on screen exists only to expand something else.
+
+The planner answers "how do I get from A to B". The **Routes** page
 answers the other question people actually have — *where do these buses go?* —
 which is what you want once you know the campus and would rather pick the route
 yourself.
@@ -481,7 +506,7 @@ overlap into an unreadable pile — and reappear when you select a route or zoom
 
 ## Canteens and other food places
 
-All 72 canteens, cafés, restaurants and food shops on campus are searchable
+All 36 canteens, cafés, restaurants and food shops on campus are searchable
 destinations, and **findable without knowing their names**. Typing `canteen`,
 `coffee`, `food`, `lunch`, `食堂` or `咖啡` into the To box lists them; picking
 one plans the trip like any other destination.
@@ -491,7 +516,7 @@ is called "Café 12" or "The Harmony", nor leave the app to look it up on a map
 somewhere else.
 
 They are identified by **OpenStreetMap's own categories**, not by matching words
-in names. Name matching finds 28 of the 72: it misses "Café 12", "Food Lab" and
+in names. Name matching finds well under half of them: it misses "Café 12", "Food Lab" and
 "The Harmony" while happily picking up anything with "Kitchen" in the name that
 is not a kitchen. `scripts/extract-places.js` stores a `food` block — category,
 cuisine, opening hours — on the places that have one and nothing on the places
@@ -504,11 +529,11 @@ own name also contains the word ranks above one that merely carries the
 category, so `canteen` reaches Shaw College Student Canteen before it reaches a
 noodle bar that happens to be tagged as one.
 
-**Places to eat** is a second way in: the same list sorted by how far each one
+The **Food** page is a second way in: the same list sorted by how far each one
 is from wherever you have said you are, filterable by kind. It is a finder, not
 a food guide — it deliberately shows only name, kind and distance.
 
-Opening hours are stored where OpenStreetMap has them (14 of 72) but are not
+Opening hours are stored where OpenStreetMap has them (11 of 36) but are not
 displayed. The Finance Office publishes authoritative hours for the ten
 centrally-run outlets, in a PDF whose text sits inside Form XObjects that
 `scripts/_pdfpos.py` does not recurse into; college canteens are on each

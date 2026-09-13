@@ -13,6 +13,7 @@
  *   - every shuttle option carries departures
  *   - a "group" always holds more than one route
  *   - the ranked list really is ranked
+ *   - last-bus lookups stay near the destination, one per route, latest first
  *
  * Then checks the walking router still routes, and that every generated route
  * shape lines up with its stop list.
@@ -67,7 +68,32 @@ for (let day = 7; day <= 13; day++) {
     }
   }
 }
-console.log(`planner: ${checked} journeys checked`);
+// last bus: sane times, near the destination, latest first, one per route
+let lastChecked = 0;
+for (let day = 7; day <= 13; day++) {
+  for (const hour of [8, 17, 22]) {
+    for (let i = 0; i < pool.length; i += 7) {
+      const dest = pool[i], origin = i % 2 ? pool[(i * 5) % pool.length] : null;
+      if (origin && origin.id === dest.id) continue;
+      const now = new Date(2026, 8, day, hour, 10);
+      let rides;
+      try { rides = planner.lastRides(dest, D, now, origin); }
+      catch (e) { problems.push(`lastRides THREW ${dest.id}: ${e.message}`); continue; }
+      lastChecked++;
+      const ids = new Set();
+      rides.forEach((r, k) => {
+        if (ids.has(r.route.id)) problems.push(`lastRides repeats ${r.route.id} for ${dest.id}`);
+        ids.add(r.route.id);
+        if (r.boardIndex >= r.alightIndex) problems.push(`lastRides bad order ${r.route.id} ${dest.id}`);
+        if (!(r.boardMinutes > 0 && r.boardMinutes < 26 * 60)) problems.push(`lastRides bad time ${r.route.id}`);
+        if (r.walkHome.minutes > D.config.lastBus.maxWalkFromStopMinutes) problems.push(`lastRides too far ${r.route.id} ${dest.id}`);
+        if (k && r.boardMinutes > rides[k - 1].boardMinutes) problems.push(`lastRides unsorted ${dest.id}`);
+      });
+    }
+  }
+}
+
+console.log(`planner: ${checked} journeys checked, ${lastChecked} last-bus lookups`);
 console.log(problems.length ? problems.slice(0, 15).join('\n') : '  no problems');
 
 // walk router health

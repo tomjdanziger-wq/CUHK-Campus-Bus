@@ -170,10 +170,9 @@
     // Ride times are the weakest number in the app when they are estimated
     // rather than published, and the user cannot tell that from a card alone.
     if (DATA.meta.rideTimesEstimated) {
-      $('estimate-banner-text').textContent =
-        'Departure times are the real published ones. Time spent ON the bus is ' +
+      $('estimate-note').textContent =
+        'Departure times are the published ones, but time spent on the bus is ' +
         'estimated from distance — CUHK does not publish stop-to-stop running times.';
-      $('estimate-banner').hidden = false;
     }
 
     var m = DATA.meta;
@@ -710,11 +709,9 @@
 
     out.innerHTML = '';
 
-    if (!state.origin || !state.destination) {
-      $('empty-state').hidden = false;
-      return;
-    }
-    $('empty-state').hidden = true;
+    renderLastBus();
+
+    if (!state.origin || !state.destination) return;
 
     var result = planner.plan(state.origin, state.destination, DATA, currentWhen());
 
@@ -722,10 +719,6 @@
       o.arrivalLabel = formatArrivalRange(result.nowMinutes, o.totalLow, o.totalHigh);
     });
 
-    var header = el('p', 'notice',
-      state.origin.name + ' → ' + state.destination.name +
-      ' · leaving ' + (state.when ? 'at ' + planner.formatHHMM(planner.minutesSinceMidnight(currentWhen())) : 'now'));
-    out.appendChild(header);
 
     result.options.forEach(function (o) {
       out.appendChild(o.kind === 'walk' ? renderWalkCard(o) : renderShuttleCard(o));
@@ -801,21 +794,26 @@
       var bounds = [];
       var add = function (pts) { for (var i = 0; i < pts.length; i++) bounds.push(pts[i]); };
 
-      // --- where the bus carries on to, faded ---
-      // Shown so a rider can see that staying on leads somewhere useful. It is
-      // drawn thin and translucent: it is context, not the recommendation.
+      // --- where the bus carries on to, dashed ---
+      // Shown so a rider can see that staying on leads somewhere useful. The
+      // dashes say "not the recommendation"; the weight and white casing keep
+      // it readable over the tiles, where a faint line simply disappeared.
       if (option.kind === 'shuttle') {
         var onward = onwardShape(option);
         if (onward.length > 1) {
           L.polyline(onward, {
-            color: option.route.colour, weight: 3.5, opacity: 0.5,
-            dashArray: '8 7', lineCap: 'butt', interactive: false
+            color: '#ffffff', weight: 9, opacity: 0.85, interactive: false
           }).addTo(state.activeLayer);
+          L.polyline(onward, {
+            color: option.route.colour, weight: 5, opacity: 1,
+            dashArray: '10 8', lineCap: 'butt', interactive: false
+          }).addTo(state.activeLayer);
+          add(onward);
         }
         (option.onwardStops || []).forEach(function (n) {
           L.circleMarker([n.stop.lat, n.stop.lng], {
-            radius: 5, color: option.route.colour, weight: 2,
-            fillColor: '#fffdf8', fillOpacity: 1, opacity: 0.7
+            radius: 6, color: option.route.colour, weight: 3,
+            fillColor: '#fffdf8', fillOpacity: 1, opacity: 1
           }).addTo(state.activeLayer).bindPopup(
             '<strong>' + n.stop.name + '</strong><br>stay on for this stop' +
             (n.walkMinutes != null
@@ -1006,17 +1004,6 @@
   }
 
   function wireNetwork() {
-    var toggle = $('network-toggle');
-    var panel = $('network-panel');
-
-    toggle.addEventListener('click', function () {
-      var open = toggle.getAttribute('aria-expanded') === 'true';
-      toggle.setAttribute('aria-expanded', String(!open));
-      panel.hidden = open;
-      toggle.classList.toggle('is-open', !open);
-      if (!open) openNetwork();
-    });
-
     renderNetworkChips();
   }
 
@@ -1293,17 +1280,6 @@
   }
 
   function wireFood() {
-    var toggle = $('food-toggle');
-    var panel = $('food-panel');
-
-    toggle.addEventListener('click', function () {
-      var open = toggle.getAttribute('aria-expanded') === 'true';
-      toggle.setAttribute('aria-expanded', String(!open));
-      panel.hidden = open;
-      toggle.classList.toggle('is-open', !open);
-      if (!open) renderFood();
-    });
-
     renderFoodChips();
   }
 
@@ -1380,16 +1356,159 @@
       btn.addEventListener('click', function () {
         $('dest-input').value = p.name;
         state.destination = p;
-        $('dest-status').textContent =
-          'Going to ' + p.name + (p.nameZh ? ' ' + p.nameZh : '') + '.';
-        $('dest-status').className = 'field__status field__status--ok';
         recompute();
-        $('results-section').scrollIntoView({ block: 'start' });
+        goToPage(PAGE_TRIP);
+        $('page-trip').scrollTop = 0;
       });
 
       li.appendChild(btn);
       list.appendChild(li);
     });
+  }
+
+  // =========================================================================
+  // Pages
+  //
+  // Routes, trip and food sit side by side in one horizontal scroller with
+  // scroll snapping, so a swipe is the browser's own gesture — momentum,
+  // rubber-banding and direction locking all come for free and feel native.
+  // The tabs mirror the scroll position and are the way in for a mouse.
+  //
+  // Each page scrolls vertically on its own, so leaving the food list and
+  // coming back finds it where you left it.
+  // =========================================================================
+
+  var PAGE_ROUTES = 0, PAGE_TRIP = 1, PAGE_FOOD = 2;
+  var currentPage = PAGE_TRIP;
+
+  function goToPage(index, instant) {
+    var pager = $('pager');
+    pager.scrollTo({ left: index * pager.clientWidth, behavior: instant ? 'auto' : 'smooth' });
+    pageShown(index);
+  }
+
+  function pageShown(index) {
+    if (index === currentPage && state.pagesReady) return;
+    currentPage = index;
+    state.pagesReady = true;
+
+    Array.prototype.forEach.call(document.querySelectorAll('.tabs__tab'), function (t) {
+      t.setAttribute('aria-selected', String(+t.dataset.page === index));
+    });
+
+    // Built on first sight rather than at load: the map pulls in Leaflet and
+    // tiles, which nobody planning a trip should have to wait for.
+    if (index === PAGE_ROUTES) openNetwork();
+    // Re-sorted every visit, because "nearest" depends on the current start.
+    if (index === PAGE_FOOD) renderFood();
+  }
+
+  function wirePager() {
+    var pager = $('pager');
+
+    Array.prototype.forEach.call(document.querySelectorAll('.tabs__tab'), function (t) {
+      t.addEventListener('click', function () { goToPage(+t.dataset.page); });
+    });
+
+    var pending = false;
+    pager.addEventListener('scroll', function () {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(function () {
+        pending = false;
+        pageShown(Math.round(pager.scrollLeft / pager.clientWidth));
+      });
+    }, { passive: true });
+
+    // Rotating the phone changes the page width; stay on the same page.
+    window.addEventListener('resize', function () {
+      pager.scrollLeft = currentPage * pager.clientWidth;
+    });
+
+    goToPage(PAGE_TRIP, true);
+  }
+
+  // =========================================================================
+  // Last bus
+  //
+  // plan() answers "what should I do now?". Late in the evening the question
+  // is "how late can I leave it?", and the answer is a single time per route
+  // that is otherwise buried at the bottom of a PDF.
+  // =========================================================================
+
+  function homePlace() {
+    var h = CFG.lastBus && CFG.lastBus.home;
+    if (!h) return null;
+    return DATA.places.filter(function (p) { return p.id === h.place; })[0] || null;
+  }
+
+  /** The next date whose timetable is the other kind: weekday ↔ Sunday. */
+  function otherServiceDay(date) {
+    var d = new Date(date);
+    var wantSunday = d.getDay() !== 0;
+    do { d.setDate(d.getDate() + 1); } while ((d.getDay() === 0) !== wantSunday);
+    d.setHours(12, 0, 0, 0);
+    return d;
+  }
+
+  function renderLastBus() {
+    var box = $('lastbus');
+    box.innerHTML = '';
+
+    var home = homePlace();
+    var dest = state.destination || home;
+    if (!dest) { box.hidden = true; return; }
+
+    var label = !state.destination && CFG.lastBus.home.label ? CFG.lastBus.home.label : dest.name;
+    var origin = state.origin && state.origin !== dest ? state.origin : null;
+    var now = currentWhen();
+
+    var rides = planner.lastRides(dest, DATA, now, origin);
+    var upcoming = rides.filter(function (r) { return !r.gone; });
+
+    box.appendChild(el('h2', 'lastbus__title', 'Last bus to ' + label));
+
+    if (!rides.length) {
+      box.appendChild(el('p', 'lastbus__none', origin
+        ? 'No shuttle today gets you meaningfully closer than walking from ' + origin.name + '.'
+        : 'No shuttle runs near there today.'));
+    } else if (!upcoming.length) {
+      var lastGone = rides[0];
+      box.appendChild(el('p', 'lastbus__none lastbus__none--gone',
+        'The last one today, ' + lastGone.route.name + ' at ' + lastGone.boardTime +
+        ', has gone.'));
+    } else {
+      var list = el('ul', 'lastbus__list');
+      upcoming.slice(0, 3).forEach(function (r) {
+        var li = el('li', 'lastbus__row');
+        li.style.setProperty('--route-colour', r.route.colour);
+        li.appendChild(el('span', 'lastbus__route', r.route.id));
+        var text = el('span', 'lastbus__text');
+        text.appendChild(el('strong', 'lastbus__time', r.boardTime));
+        text.appendChild(document.createTextNode(
+          (r.fromFirstStop ? ' leaves ' : ' from ') + r.boardStop.name));
+        text.appendChild(el('span', 'lastbus__sub',
+          'off at ' + r.alightStop.name +
+          (r.walkHome.metres < 30 ? '' : ', then ' + formatLeg(r.walkHome.minutes) + ' walk')));
+        li.appendChild(text);
+        list.appendChild(li);
+      });
+      box.appendChild(list);
+    }
+
+    // The other timetable, in one line. Sunday's last bus is not Monday's,
+    // and the time you need to know is often the one for tomorrow.
+    var other = otherServiceDay(now);
+    var otherRides = planner.lastRides(dest, DATA, other, origin);
+    if (otherRides.length) {
+      var o = otherRides[0];
+      box.appendChild(el('p', 'lastbus__other',
+        (other.getDay() === 0 ? 'Sundays & public holidays'
+          : describeDays(o.route.runsOn).replace(/^./, function (c) { return c.toUpperCase(); })) + ': ' +
+        o.route.name + ', last at ' + o.boardTime + ' from ' + o.boardStop.name + '.'));
+    }
+
+    box.hidden = false;
   }
 
   // =========================================================================
@@ -1404,16 +1523,14 @@
       state.originSource = 'manual';
       state.originCorrected = true;
       $('gps-btn').setAttribute('aria-pressed', 'false');
-      setOriginStatus('Starting from ' + place.name + (place.nameZh ? ' ' + place.nameZh : '') + '.', 'ok');
+      // The box already shows the name; repeating it underneath is a wasted row.
+      setOriginStatus('');
       $('origin-confirm').hidden = true;
       recompute();
     };
 
     var pickDestination = function (place) {
       state.destination = place;
-      $('dest-status').textContent =
-        'Going to ' + place.name + (place.nameZh ? ' ' + place.nameZh : '') + '.';
-      $('dest-status').className = 'field__status field__status--ok';
       recompute();
     };
 
@@ -1438,8 +1555,7 @@
 
       $('origin-input').value = state.origin ? state.origin.name : '';
       $('dest-input').value = state.destination ? state.destination.name : '';
-      setOriginStatus(state.origin ? 'Starting from ' + state.origin.name + '.' : '', 'ok');
-      $('dest-status').textContent = state.destination ? 'Going to ' + state.destination.name + '.' : '';
+      setOriginStatus('');
       $('origin-confirm').hidden = true;
       recompute();
     });
@@ -1462,6 +1578,8 @@
 
     wireNetwork();
     wireFood();
+    wirePager();
+    render();
 
     // Waits count down in real time, so a stale screen is a wrong screen.
     setInterval(function () { if (!state.when) render(); }, 30000);

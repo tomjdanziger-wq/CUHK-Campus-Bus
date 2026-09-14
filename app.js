@@ -450,6 +450,9 @@
     var time = el('span', 'walkrow__time');
     time.appendChild(el('strong', null, formatRange(o.totalLow, o.totalHigh)));
     time.appendChild(document.createTextNode(' min'));
+    // Without "arrive": the row is one line wide and the clock time reads
+    // for itself under the duration.
+    time.appendChild(el('span', 'walkrow__arrive', o.arrivalLabel.replace(/^arrive /, '')));
     row.appendChild(time);
     row.appendChild(icon('map', 'walkrow__map'));
 
@@ -512,6 +515,7 @@
     var time = el('div', 'opt__time');
     time.appendChild(el('strong', 'opt__time-range', formatRange(o.travelLow, o.travelHigh)));
     time.appendChild(el('span', 'opt__time-unit', 'min travel'));
+    time.appendChild(el('span', 'opt__arrive', o.arrivalLabel));
     head.appendChild(time);
     card.appendChild(head);
 
@@ -563,7 +567,6 @@
     waitText.appendChild(document.createTextNode(
       ' for the ' + o.departureTime +
       (routes.length > 1 ? ' (Route ' + o.route.id + ')' : '')));
-    waitText.appendChild(el('span', 'waitline__arrive', o.arrivalLabel));
     waitRow.appendChild(waitText);
     body.appendChild(waitRow);
 

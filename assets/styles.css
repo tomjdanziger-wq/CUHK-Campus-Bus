@@ -488,7 +488,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .walkrow__text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .walkrow__label { font-size: 15px; font-weight: 500; }
 .walkrow__sub { margin-left: 6px; font-size: 13px; color: var(--ink-3); }
-.walkrow__time { flex-shrink: 0; font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.walkrow__time { flex-shrink: 0; text-align: right; font-size: 13px; line-height: 1.25; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.walkrow__arrive { display: block; font-size: 12.5px; }
 .walkrow__time strong { font-size: 16px; font-weight: 500; color: var(--ink); }
 .opt--best .walkrow__time strong { color: var(--walk); }
 .walkrow__map { width: 18px; height: 18px; color: var(--accent); }
@@ -496,7 +497,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .opt--walk .map-panel { margin-left: 0; }
 .opt + .opt, .opt + .notice { border-top: 1px solid var(--line); }
 
-.opt__head { display: flex; align-items: center; gap: 12px; }
+.opt__head { display: flex; align-items: flex-start; gap: 12px; }
 .opt__head .icon--mode { color: var(--ink-3); }
 
 .opt__titles { flex: 1; min-width: 0; }
@@ -568,12 +569,6 @@ button { -webkit-tap-highlight-color: transparent; }
 .waitline .icon { margin-top: 2px; color: var(--accent); }
 .waitline__text { flex: 1; min-width: 0; }
 .waitline strong { color: var(--accent-ink); font-weight: 600; }
-.waitline__arrive {
-  display: block;
-  font-size: 13.5px;
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
-}
 
 /* --- leg breakdown ------------------------------------------------------ */
 

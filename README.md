@@ -570,6 +570,41 @@ substring matching fails on both — "Nos." sits between the words — and then 
 fall through to fuzzy matching and tie. Matching word by word, `3` starts the
 word `3` but does not start `13`.
 
+### Building codes
+
+Timetables and calendars name rooms by CUSIS building code — `ERB 407`,
+`LSK LT6`, `YIA LT8`. Every code on the Graduate School's
+[building abbreviations list](https://www.gs.cuhk.edu.hk/academics/teaching-timetable/building-abbreviation)
+that matches a building in the app is an alias in `placeAliases`. Search
+ignores a trailing room (anything with a digit, or `LT`), so a calendar entry
+can be pasted as it is, with or without the space (`erb407`). The result shows
+the full building name with the code beside it.
+
+When the list changes, add the code to the building's `placeAliases` entry. A
+code only counts as a match on its own once the room is stripped, so `ERB 407`
+finds ERB and not every building with "erb" somewhere in its name.
+
+### Choosing on the map
+
+Every search box ends with **Choose on map**: a full-screen map with a fixed pin
+you move the map under, for places you can find but cannot name. The spot is
+named after the nearest place (`Pin near Pi Ch'iu Building`), or takes that
+place's name outright within 25 m, and gets its elevation interpolated from
+nearby known points, the same way a GPS fix does.
+
+## Live location
+
+Every map (trip, route browser, pin picker) has a locate button. It shows a
+blue dot with an accuracy circle and follows you as you walk; drag the map and
+it stops following but keeps the dot. The dot never changes the journey: the
+start stays whatever you set.
+
+It starts on its own only when location permission is already granted, so
+opening a map never causes a permission prompt, and it stops watching while
+the app is in the background to save battery. The start marker on the trip map
+is a hollow ring, like the start dot in the search box, so the solid dot always
+means "you, now".
+
 ## Deliberately not built (v1)
 
 - Real-time tracking. There is no data source, and no amount of UI would make one up honestly.

@@ -36,7 +36,9 @@
     netLayer: null,
     netRoute: null,
     netZoomBound: false,
-    foodGroup: null
+    foodGroup: null,
+    picker: null,          // { map, onPick }
+    live: null             // see "Live location"
   };
 
 
@@ -61,6 +63,7 @@
     swap:  'M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z',
     home:  'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
     train: 'M12 2c-4 0-8 .5-8 4v9.5A3.5 3.5 0 0 0 7.5 19L6 20.5v.5h2.23l2-2H14l2 2h2v-.5L16.5 19a3.5 3.5 0 0 0 3.5-3.5V6c0-3.5-3.58-4-8-4zM7.5 17a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3.5-7H6V6h5v4zm2 0V6h5v4h-5zm3.5 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
+    pin:   'M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z',
     gps:   'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A9 9 0 0 0 13 3.06V1h-2v2.06A9 9 0 0 0 3.06 11H1v2h2.06A9 9 0 0 0 11 20.94V23h2v-2.06A9 9 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z'
   };
 
@@ -233,9 +236,30 @@
     });
   }
 
-  function wireAutocomplete(inputId, listId, onPick) {
+  function wireAutocomplete(inputId, listId, onPick, pickerTitle) {
     var input = $(inputId);
     var list = $(listId);
+
+    // Always the last row, and the only row while the box is empty: for when
+    // you know where it is but not what it is called.
+    function mapRow() {
+      var li = document.createElement('li');
+      var btn = el('button', 'results__map');
+      btn.type = 'button';
+      btn.setAttribute('role', 'option');
+      btn.appendChild(icon('pin'));
+      btn.appendChild(el('span', null, 'Choose on map'));
+      btn.addEventListener('click', function () {
+        close();
+        input.blur();
+        openPicker(pickerTitle, function (place) {
+          input.value = place.name;
+          onPick(place);
+        });
+      });
+      li.appendChild(btn);
+      return li;
+    }
 
     function close() {
       list.hidden = true;
@@ -244,13 +268,8 @@
     }
 
     function render(query) {
-      var matches = finder.search(query, DATA.places, 8);
+      var matches = query ? finder.search(query, DATA.places, 8) : [];
       list.innerHTML = '';
-
-      if (!matches.length) {
-        close();
-        return;
-      }
 
       matches.forEach(function (m) {
         var li = document.createElement('li');
@@ -259,6 +278,12 @@
         btn.setAttribute('role', 'option');
 
         var name = el('span', 'results__name', m.place.name);
+        // Found by its building code ("ERB 407"): show the code next to the
+        // full name, so it is obvious why this building came up.
+        if (m.matched && /^[A-Z][A-Z0-9]{1,4}( LT)?$/.test(m.matched) &&
+            m.matched !== m.place.name) {
+          name.appendChild(el('span', 'results__tag', m.matched));
+        }
         if (m.place.stopId) {
           var tag = el('span', 'results__tag', 'SHUTTLE STOP');
           name.appendChild(tag);
@@ -277,24 +302,23 @@
         list.appendChild(li);
       });
 
+      list.appendChild(mapRow());
       list.hidden = false;
       input.setAttribute('aria-expanded', 'true');
     }
 
     input.addEventListener('input', function () {
-      var q = input.value.trim();
-      if (q.length < 1) { close(); return; }
-      render(q);
+      render(input.value.trim());
     });
 
     input.addEventListener('focus', function () {
-      if (input.value.trim()) render(input.value.trim());
+      render(input.value.trim());
     });
 
     // Enter picks the top match, so the keyboard flow works without tapping.
     input.addEventListener('keydown', function (e) {
       if (e.key !== 'Enter') return;
-      var first = list.querySelector('button');
+      var first = list.querySelector('button:not(.results__map)');
       if (first) { e.preventDefault(); first.click(); }
     });
 
@@ -798,6 +822,7 @@
         state.ghostLayer = L.layerGroup().addTo(state.map);
         state.activeLayer = L.layerGroup().addTo(state.map);
         drawGhostNetwork(L);
+        attachLive(L, state.map);
       }
 
       var map = state.map;
@@ -885,7 +910,14 @@
         marker(option.alightStop, 'Get off: ' + option.alightStop.name,
                option.route.colour, 7);
       }
-      marker(state.origin, 'Start: ' + state.origin.name, '#1a73e8');
+      // Hollow, like the start dot in the search box — the solid blue dot is
+      // reserved for where you are right now.
+      if (state.origin) {
+        L.circleMarker([state.origin.lat, state.origin.lng], {
+          radius: 6, color: '#1a73e8', weight: 3, fillColor: '#ffffff', fillOpacity: 1
+        }).addTo(state.activeLayer).bindPopup('Start: ' + state.origin.name);
+        bounds.push([state.origin.lat, state.origin.lng]);
+      }
       marker(state.destination, 'Destination: ' + state.destination.name, '#d93025');
 
       if (bounds.length) map.fitBounds(bounds, { padding: [35, 35] });
@@ -1056,6 +1088,7 @@
           maxZoom: 19, attribution: '© OpenStreetMap contributors'
         }).addTo(state.netMap);
         state.netLayer = L.layerGroup().addTo(state.netMap);
+        attachLive(L, state.netMap);
       }
 
       var map = state.netMap;
@@ -1525,6 +1558,219 @@
   }
 
   // =========================================================================
+  // Live location
+  //
+  // A blue dot on every map that follows you as you walk, so you can check
+  // you are still on the right path. It is only ever shown, never used: the
+  // start of the journey stays whatever you set, and the dot does not move it.
+  //
+  // It starts on its own only if location permission is already granted —
+  // a map opening should never be what triggers a permission prompt. The
+  // locate button on each map starts it otherwise, and centres on you.
+  // =========================================================================
+
+  function liveState() {
+    if (!state.live) state.live = { watchId: null, fix: null, maps: [], follow: null };
+    return state.live;
+  }
+
+  function startLive(recentreMap) {
+    var live = liveState();
+    if (recentreMap) live.follow = recentreMap;
+    if (live.fix && recentreMap) {
+      recentreMap.setView([live.fix.lat, live.fix.lng], Math.max(recentreMap.getZoom(), 17));
+    }
+    if (live.watchId !== null || !navigator.geolocation) return;
+
+    live.watchId = navigator.geolocation.watchPosition(function (pos) {
+      live.fix = { lat: pos.coords.latitude, lng: pos.coords.longitude,
+                   accuracy: pos.coords.accuracy || 0 };
+      live.maps.forEach(function (m) { drawLive(m); });
+      if (live.follow) {
+        var z = live.follow._liveCentred ? live.follow.getZoom() : Math.max(live.follow.getZoom(), 17);
+        live.follow._liveCentred = true;
+        live.follow.setView([live.fix.lat, live.fix.lng], z, { animate: true });
+      }
+    }, function () {
+      stopLive();
+      live.maps.forEach(function (m) { m.entry.button.setAttribute('aria-pressed', 'false'); });
+    }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+
+    live.maps.forEach(function (m) { m.entry.button.setAttribute('aria-pressed', 'true'); });
+  }
+
+  function stopLive() {
+    var live = liveState();
+    if (live.watchId !== null) navigator.geolocation.clearWatch(live.watchId);
+    live.watchId = null;
+  }
+
+  function drawLive(m) {
+    var fix = liveState().fix;
+    if (!fix) return;
+    var ll = [fix.lat, fix.lng];
+    if (!m.dot) {
+      m.halo = window.L.circle(ll, {
+        radius: fix.accuracy, color: '#1a73e8', weight: 1, opacity: 0.35,
+        fillColor: '#1a73e8', fillOpacity: 0.12, interactive: false
+      }).addTo(m.map);
+      m.dot = window.L.marker(ll, {
+        icon: window.L.divIcon({ className: 'livedot', html: '<span></span>', iconSize: [18, 18] }),
+        interactive: false, keyboard: false, zIndexOffset: 1000
+      }).addTo(m.map);
+    } else {
+      m.dot.setLatLng(ll);
+      m.halo.setLatLng(ll).setRadius(fix.accuracy);
+    }
+  }
+
+  function attachLive(L, map) {
+    var live = liveState();
+    var m = { map: map, dot: null, halo: null, entry: null };
+
+    var Locate = L.Control.extend({
+      options: { position: 'bottomright' },
+      onAdd: function () {
+        var b = L.DomUtil.create('button', 'locate-btn');
+        b.type = 'button';
+        b.title = 'Show my location';
+        b.setAttribute('aria-label', 'Show and follow my location');
+        b.setAttribute('aria-pressed', String(live.watchId !== null));
+        b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="' +
+                      ICON_PATHS.gps + '"/></svg>';
+        L.DomEvent.disableClickPropagation(b);
+        L.DomEvent.on(b, 'click', function () { map._liveCentred = false; startLive(map); });
+        m.entry = { button: b };
+        return b;
+      }
+    });
+    map.addControl(new Locate());
+
+    // Dragging the map means "let me look around": stop following, keep the dot.
+    map.on('dragstart', function () { if (live.follow === map) live.follow = null; });
+
+    live.maps.push(m);
+    drawLive(m);
+
+    if (live.watchId === null && navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then(function (p) {
+        if (p.state === 'granted') startLive(null);
+      }).catch(function () {});
+    }
+  }
+
+  // Watching GPS drains the battery; nobody needs it while the app is hidden.
+  document.addEventListener('visibilitychange', function () {
+    var live = state.live;
+    if (!live) return;
+    if (document.hidden) {
+      live.resume = live.watchId !== null;
+      stopLive();
+    } else if (live.resume) {
+      startLive(null);
+    }
+  });
+
+  // =========================================================================
+  // Drop a pin
+  //
+  // For "that building by the lake, whatever it is called". The map moves
+  // under a fixed pin; the nearest named place is shown so you can tell the
+  // pin is where you meant, and becomes the label for the journey.
+  // =========================================================================
+
+  var PICKER_DEFAULT = [22.4196, 114.2068];   // roughly the middle of campus
+
+  // Places too big to name a spot by. The university's OSM point sits in the
+  // middle of campus, so without this every pin there is "near CUHK".
+  var TOO_BIG_TO_NAME = { 'the-chinese-university-of-hong-kong': true };
+
+  function nearestPlace(lat, lng) {
+    var best = null, bestD = Infinity;
+    DATA.places.forEach(function (p) {
+      if (TOO_BIG_TO_NAME[p.id]) return;
+      var d = geo.haversineMetres({ lat: lat, lng: lng }, p);
+      if (d < bestD) { bestD = d; best = p; }
+    });
+    return best ? { place: best, metres: bestD } : null;
+  }
+
+  function pinnedPlace(lat, lng) {
+    var near = nearestPlace(lat, lng);
+    var point = { lat: lat, lng: lng };
+    point.elevation = geo.estimateElevation(point, DATA.places);
+    // Right on top of a known place: it IS that place, and the journey should
+    // say so. Otherwise name it by what it is next to.
+    if (near && near.metres <= 25) {
+      point.name = near.place.name;
+      point.nameZh = near.place.nameZh || null;
+    } else {
+      point.name = near && near.metres <= 250 ? 'Pin near ' + near.place.name : 'Dropped pin';
+      point.nameZh = null;
+    }
+    return point;
+  }
+
+  function openPicker(which, onPick) {
+    var picker = $('picker');
+    var isStart = which === 'start';
+    $('picker-title').textContent = isStart ? 'Choose start' : 'Choose destination';
+    $('picker-ok').textContent = isStart ? 'Set start' : 'Set destination';
+    picker.hidden = false;
+    $('picker-ok').disabled = false;
+
+    var current = isStart ? state.origin : state.destination;
+    var fix = state.live && state.live.fix;
+    var centre = current ? [current.lat, current.lng]
+               : fix ? [fix.lat, fix.lng]
+               : PICKER_DEFAULT;
+
+    loadLeaflet().then(function (L) {
+      if (!state.picker) {
+        var map = L.map('picker-map', { zoomControl: false, attributionControl: true });
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19, attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        map.on('move', updatePickerLabel);
+        attachLive(L, map);
+        state.picker = { map: map, onPick: null };
+      }
+      state.picker.onPick = onPick;
+      state.picker.map.invalidateSize();
+      state.picker.map.setView(centre, current ? 18 : 17, { animate: false });
+      updatePickerLabel();
+    }).catch(function () {
+      $('picker-near').textContent = 'The map could not load. Search by name instead.';
+      $('picker-ok').disabled = true;
+    });
+  }
+
+  function updatePickerLabel() {
+    if (!state.picker) return;
+    var c = state.picker.map.getCenter();
+    $('picker-near').textContent = pinnedPlace(c.lat, c.lng).name;
+  }
+
+  function closePicker() {
+    $('picker').hidden = true;
+    if (state.live && state.picker && state.live.follow === state.picker.map) state.live.follow = null;
+  }
+
+  function wirePicker() {
+    $('picker-close').addEventListener('click', closePicker);
+    $('picker-ok').addEventListener('click', function () {
+      if (!state.picker) return;
+      var c = state.picker.map.getCenter();
+      var onPick = state.picker.onPick;
+      closePicker();
+      if (onPick) onPick(pinnedPlace(c.lat, c.lng));
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !$('picker').hidden) closePicker();
+    });
+  }
+
+  // =========================================================================
   // Wiring
   // =========================================================================
 
@@ -1547,8 +1793,9 @@
       recompute();
     };
 
-    wireAutocomplete('origin-input', 'origin-results', pickOrigin);
-    wireAutocomplete('dest-input', 'dest-results', pickDestination);
+    wireAutocomplete('origin-input', 'origin-results', pickOrigin, 'start');
+    wireAutocomplete('dest-input', 'dest-results', pickDestination, 'destination');
+    wirePicker();
 
     renderQuickPicks('origin-input', CFG.quickPicks && CFG.quickPicks.from, pickOrigin, 'Start from');
     renderQuickPicks('dest-input', CFG.quickPicks && CFG.quickPicks.to, pickDestination, 'Go to');

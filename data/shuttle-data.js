@@ -404,9 +404,9 @@
     'chung-chi-college':                   ['CC', 'Chung Chi'],
     'shaw-college':                        ['Shaw'],
     'wu-yee-sun-college':                  ['WYS'],
-    'lee-woo-sing-college':                ['LWS'],
+    'lee-woo-sing-college':                ['LWS', 'WS1'],
     'sh-ho-college':                       ['SHHO', 'S.H. Ho'],
-    'morningside-college':                 ['MC'],
+    'morningside-college':                 ['MC', 'MCO'],
     'c-w-chu-college':                     ['CWC', 'Chu College'],
 
     // --- halls of residence ---------------------------------------------
@@ -424,33 +424,65 @@
     // --- teaching and admin ---------------------------------------------
     'university-library':                  ['UL', 'Main Library', 'Uni Library'],
     'university-science-centre':           ['Science Centre', 'SC'],
+    'science-centre-east-block':           ['SCE'],
     'yasumoto-international-academic-park': ['YIA', 'YIAP', 'Yasumoto'],
     'benjamin-franklin-centre':            ['BFC', 'Benjamin Franklin'],
-    'sir-run-run-shaw-hall':               ['Shaw Hall', 'SRRSH'],
+    'sir-run-run-shaw-hall':               ['Shaw Hall', 'SRRSH', 'RRS'],
     'university-administration-building':  ['UAB', 'Admin Building'],
     'pommerenke-student-centre':           ['Pomm', 'PSC'],
     'esther-lee-building':                 ['ELB'],
     'mong-man-wai-building':               ['MMW'],
     'lady-shaw-building':                  ['LSB'],
-    'sino-building':                       ['Sino'],
-    'cheng-ming-building':                 ['CMB'],
-    'chien-mu-library':                    ["Ch'ien Mu", 'New Asia Library'],
+    'sino-building':                       ['SB', 'Sino'],
+    'cheng-ming-building':                 ['NAA', 'CMB'],
+    'chien-mu-library':                    ['CML', "Ch'ien Mu", 'New Asia Library'],
     'fong-shu-chuen-building':             ['FSC'],
     'wu-ho-man-yuen-building':             ['WMY', 'Wu Ho Man Yuen'],
     'academic-building-no1':               ['AB1', 'Academic Building 1'],
     'academic-building-no2':               ['AB2', 'Academic Building 2'],
     'cheng-yu-tung-building':              ['CYT', 'Business School'],
-    'leung-kau-kui-building':              ['LKK'],
+    'leung-kau-kui-building':              ['KKB', 'LKK'],
     'lee-shau-kee-building':               ['LSK'],
     'li-dak-sum-building':                 ['LDS'],
     'tin-ka-ping-building':                ['TKP'],
-    'william-mw-mong-engineering-building': ['Engineering', 'Mong Engineering'],
-    'ho-sin-hang-engineering-building':     ['HSH', 'Engineering'],
+    'william-mw-mong-engineering-building': ['ERB', 'Engineering', 'Mong Engineering'],
+    'ho-sin-hang-engineering-building':     ['SHB', 'HSH', 'Engineering', 'TYW', 'T.Y. Wong Hall'],
+
+    // --- CUSIS building codes -------------------------------------------
+    // What the teaching timetable and everyone's calendar actually say:
+    // "ERB 407", "LSK LT6". Taken from the Graduate School's list of building
+    // abbreviations (gs.cuhk.edu.hk, teaching timetable). Search ignores the
+    // room number after the code, so the whole calendar entry can be pasted.
+    // Codes already given above (MMW, LSB, YIA, ...) are not repeated.
+    'lee-shau-kee-architecture-building':  ['ARC'],
+    'art-museum':                          ['AMEW', 'Art Museum East Wing'],
+    'choh-ming-li-basic-medical-sciences-building': ['BMS'],
+    'chung-chi-college-chapel':            ['CCCC'],
+    'theology-building':                   ['CCT'],
+    'chen-kou-bun-building':               ['CKB'],
+    'wong-foo-yuan-building':              ['FYB'],
+    'pi-chiu-building':                    ['HCA'],
+    'ho-tim-building':                     ['HTB'],
+    'hui-yeung-shing-building':            ['HYS'],
+    'institute-of-chinese-studies':        ['ICS'],
+    'kwok-sports-building':                ['KSB'],
+    'yc-liang-hall':                       ['LHC', 'LPN', 'Lai Chan Pui Ngong Lecture Theatre'],
+    'li-koon-chun-hall':                   ['LKC'],
+    'lingnan-stadium':                     ['LN'],
+    'new-asia-gymnasium':                  ['NAG'],
+    'humanities-building':                 ['NAH'],
+    'shaw-college-lecture-theatre':        ['SWC LT', 'SWC'],
+    'tsang-shiu-tim-building':             ['UCA'],
+    'tc-cheng-building':                   ['UCC'],
+    'university-gymnasium':                ['UG'],
+    'wen-lan-tang':                        ['WLS'],
+    'fung-king-hey-building':              ['KHB', 'SWH', 'Swire Hall'],
+    'university-sports-centre':            ['USC'],
 
     // --- services -------------------------------------------------------
     'university-health-centre':            ['clinic', 'health centre', 'doctor', 'medical'],
     'cuhk-medical-centre':                 ['hospital', 'CUHK Hospital'],
-    'sir-philip-haddon-cave-sports-field':  ['running track', 'athletics track', 'football pitch', 'sports field'],
+    'sir-philip-haddon-cave-sports-field':  ['HCF', 'running track', 'athletics track', 'football pitch', 'sports field'],
     'si-yuan-amphitheatre':                ['Si Yuan']
   };
 

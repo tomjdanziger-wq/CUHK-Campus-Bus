@@ -154,10 +154,11 @@
       // the long way round exceeds this and stays on its own card.
       groupRideToleranceMinutes: 4,
 
-      // Drop shuttle options that lose to the direct walk by more than this.
-      // Generous on purpose — a bus that ties with walking still saves you the
-      // climb and stays on the list. This only removes the absurd cases, like
-      // a 58-minute wait offered next to an 8-minute stroll.
+      // Drop shuttle options whose walking plus riding — the wait NOT counted —
+      // loses to the direct walk by more than this. The wait is left out so a
+      // route does not disappear just because its bus has left; it stays,
+      // showing the next departure. This removes only the absurd cases, like
+      // a bus that goes round the whole campus to cover a short stroll.
       maxWorseThanWalkMinutes: 15,
 
       // "Walk further for a better bus" — only surface a further-away boarding
@@ -172,8 +173,9 @@
       // extra walking of the genuinely closest stop.
       nearStopToleranceMinutes: 2,
 
-      // How many options to show, direct walk included.
-      maxOptions: 4,
+      // How many options to show, direct walk included. Room for four buses, so
+      // a route whose bus has just left is not squeezed out by quicker ones.
+      maxOptions: 5,
 
       // How far ahead to look for departures.
       lookAheadMinutes: 90,

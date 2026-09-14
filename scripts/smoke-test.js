@@ -94,6 +94,23 @@ for (let day = 7; day <= 13; day++) {
 }
 
 console.log(`planner: ${checked} journeys checked, ${lastChecked} last-bus lookups`);
+// A route must not vanish because its bus just left. Walk minute by minute
+// through a weekday from I House 6 to the station: Route 4 runs to the door
+// every twenty minutes, so it has to be on the list the whole time, just with
+// a later departure. It used to disappear for most of every gap.
+{
+  const home = D.places.find(p => p.id === 'university-residence-nos-3');
+  const station = D.places.find(p => p.id === 'stop:univ-station');
+  let missing = 0;
+  for (let m = 10 * 60; m < 16 * 60; m++) {
+    const when = new Date('2026-09-14T00:00:00');   // a Monday in term
+    when.setHours(0, m);
+    const r = planner.plan(home, station, D, when);
+    if (!r.options.some(o => o.kind !== 'walk' && (o.routes || [o.route]).some(x => x.id === '4'))) missing++;
+  }
+  if (missing) problems.push(`Route 4 missing from I House 6 -> station for ${missing} of 360 minutes`);
+}
+
 console.log(problems.length ? problems.slice(0, 15).join('\n') : '  no problems');
 
 // walk router health

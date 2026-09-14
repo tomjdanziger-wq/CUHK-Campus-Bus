@@ -282,7 +282,7 @@ It deliberately does **not** assume the nearest stop is the right stop. Sometime
    but loops the long way round exceeds `groupRideToleranceMinutes` (4) and
    keeps its own card, because that is a genuinely different ride.
 2. **Dominance.** An option must save at least `minWalkSavedMinutes` (3) of *walking* versus going on foot the whole way. This kills suggestions like "walk 5 minutes to a stop and 14 minutes from the next one" to avoid a 17-minute walk. The filter is about walking, not total time — a bus that merely ties with walking still saves you the climb and stays on the list.
-3. **Sanity cap.** Options losing to the walk by more than `maxWorseThanWalkMinutes` (15) are dropped. A 58-minute wait next to an 8-minute stroll is honest and useless.
+3. **Sanity cap.** Options whose walking plus riding loses to the walk by more than `maxWorseThanWalkMinutes` (15) are dropped. The wait is deliberately not counted: a route whose bus has just left stays on the list with its next departure instead of vanishing, ranked below the quicker options.
 4. **One per bus, per stop.** Two options from the same stop that share a
    route are the same bus — the only difference is where you get off, which
    "Or stay on for" already covers. Kept greedily, best first.

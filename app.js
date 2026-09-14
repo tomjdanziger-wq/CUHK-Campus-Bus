@@ -792,7 +792,13 @@
       var js = document.createElement('script');
       js.src = LEAFLET_JS;
       js.onload = function () { resolve(window.L); };
-      js.onerror = function () { reject(new Error('Leaflet failed to load')); };
+      js.onerror = function () {
+        // Forget the failure, so the next tap tries again (the phone may just
+        // have been between networks) instead of failing forever.
+        state.mapLoading = null;
+        js.remove();
+        reject(new Error('Leaflet failed to load'));
+      };
       document.head.appendChild(js);
     });
     return state.mapLoading;
@@ -810,6 +816,10 @@
    */
   function showMapFor(option) {
     var container = $('map');
+    // A previous failure may have hidden it; every attempt starts clean.
+    container.hidden = false;
+    $('map-note').textContent =
+      'Illustrative. The written instructions above are the accurate part.';
 
     loadLeaflet().then(function (L) {
       if (!state.map) {
@@ -924,12 +934,16 @@
       renderLegend(option);
       setTimeout(function () { map.invalidateSize(); }, 0);
 
-    }).catch(function () {
+    }, function () {
+      // Only a failure to LOAD the map hides it. A bug while drawing used to
+      // land here too, and hid the map for the rest of the session.
       container.hidden = true;
       $('map-legend').innerHTML = '';
       $('map-note').textContent =
         'The map could not load. Everything above still works — the written ' +
         'instructions are the accurate part anyway.';
+    }).catch(function (err) {
+      if (window.console) console.error('Map drawing failed:', err);
     });
   }
 
@@ -1080,6 +1094,8 @@
 
   function openNetwork() {
     var container = $('network-map');
+    var oldNote = $('network-map-note');
+    if (oldNote) oldNote.textContent = '';
 
     loadLeaflet().then(function (L) {
       if (!state.netMap) {
@@ -1169,9 +1185,18 @@
 
       setTimeout(function () { map.invalidateSize(); syncNetworkLabels(); }, 0);
 
-    }).catch(function () {
-      container.innerHTML =
-        '<p class="map-note">The map could not load. The stop list below still works.</p>';
+    }, function () {
+      // A note beside the map, not in place of it: replacing the container
+      // destroyed it, so the map could never open again even once online.
+      var note = $('network-map-note');
+      if (!note) {
+        note = el('p', 'map-note');
+        note.id = 'network-map-note';
+        container.parentNode.insertBefore(note, container.nextSibling);
+      }
+      note.textContent = 'The map could not load. The stop list below still works.';
+    }).catch(function (err) {
+      if (window.console) console.error('Route map drawing failed:', err);
     });
 
     renderNetworkList();
@@ -1593,10 +1618,10 @@
       }
     }, function () {
       stopLive();
-      live.maps.forEach(function (m) { m.entry.button.setAttribute('aria-pressed', 'false'); });
+      live.maps.forEach(function (m) { if (m.entry) m.entry.button.setAttribute('aria-pressed', 'false'); });
     }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
 
-    live.maps.forEach(function (m) { m.entry.button.setAttribute('aria-pressed', 'true'); });
+    live.maps.forEach(function (m) { if (m.entry) m.entry.button.setAttribute('aria-pressed', 'true'); });
   }
 
   function stopLive() {
@@ -1624,7 +1649,20 @@
     }
   }
 
+  /**
+   * Live location is an extra. Whatever goes wrong in it — a browser without
+   * the Permissions API, one that throws instead of rejecting — must never
+   * stop the map itself from drawing.
+   */
   function attachLive(L, map) {
+    try {
+      attachLiveUnsafe(L, map);
+    } catch (err) {
+      if (window.console) console.warn('Live location unavailable:', err);
+    }
+  }
+
+  function attachLiveUnsafe(L, map) {
     var live = liveState();
     var m = { map: map, dot: null, halo: null, entry: null };
 
@@ -1653,9 +1691,11 @@
     drawLive(m);
 
     if (live.watchId === null && navigator.permissions && navigator.permissions.query) {
-      navigator.permissions.query({ name: 'geolocation' }).then(function (p) {
-        if (p.state === 'granted') startLive(null);
-      }).catch(function () {});
+      try {
+        Promise.resolve(navigator.permissions.query({ name: 'geolocation' })).then(function (p) {
+          if (p && p.state === 'granted') startLive(null);
+        }).catch(function () {});
+      } catch (e) { /* older Safari throws here; the locate button still works */ }
     }
   }
 
@@ -1739,9 +1779,11 @@
       state.picker.map.invalidateSize();
       state.picker.map.setView(centre, current ? 18 : 17, { animate: false });
       updatePickerLabel();
-    }).catch(function () {
+    }, function () {
       $('picker-near').textContent = 'The map could not load. Search by name instead.';
       $('picker-ok').disabled = true;
+    }).catch(function (err) {
+      if (window.console) console.error('Pin map failed:', err);
     });
   }
 

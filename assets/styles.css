@@ -799,6 +799,11 @@ li + li > .results__map { border-top: 1px solid var(--line); }
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--surface-2);
+  /* Its own stacking context. Without it, iOS Safari can drop the map's
+     vector and marker layers when an ancestor also clips with rounded
+     corners (the option list does), leaving only the tiles. */
+  isolation: isolate;
+  transform: translateZ(0);
 }
 .map--network { height: 52vh; min-height: 260px; box-shadow: var(--shadow-1); }
 .map-note { margin: 6px 0 0; font-size: 13px; color: var(--ink-3); }

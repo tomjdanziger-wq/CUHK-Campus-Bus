@@ -760,6 +760,14 @@
       if (o.kind !== 'walk') out.appendChild(renderShuttleCard(o));
     });
 
+    // The option being mapped can drop out of the list between refreshes
+    // (the GPS fix lands, a bus leaves). Then no card claims the map panel,
+    // and it was left dangling at the bottom of the page.
+    if (state.selectedKey && panel.parentNode === document.body) {
+      state.selectedKey = null;
+      panel.hidden = true;
+    }
+
     if (result.noShuttleReason) {
       out.appendChild(el('p', 'notice', result.noShuttleReason));
     }
@@ -822,20 +830,39 @@
       'Illustrative. The written instructions above are the accurate part.';
 
     loadLeaflet().then(function (L) {
+      // Each part of the drawing is isolated. One of them failing on some
+      // phone used to abort everything after it — route, walk, markers and
+      // all — and because the map object had already been created, every
+      // later attempt skipped setup and failed the same way: tiles, nothing
+      // else, for the rest of the session.
+      var problems = [];
+      function safely(what, fn) {
+        try { fn(); } catch (err) {
+          problems.push(what + ': ' + (err && err.message || err));
+          if (window.console) console.error('Map: ' + what + ' failed', err);
+        }
+      }
+
       if (!state.map) {
-        state.map = L.map(container, { scrollWheelZoom: false });
+        var created = L.map(container, { scrollWheelZoom: false });
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '© OpenStreetMap contributors'
-        }).addTo(state.map);
-
-        state.ghostLayer = L.layerGroup().addTo(state.map);
-        state.activeLayer = L.layerGroup().addTo(state.map);
-        drawGhostNetwork(L);
-        attachLive(L, state.map);
+        }).addTo(created);
+        state.map = created;
+        attachLive(L, created);
       }
-
       var map = state.map;
+      if (!state.ghostLayer) {
+        state.ghostLayer = L.layerGroup().addTo(map);
+        safely('other routes', function () { drawGhostNetwork(L); });
+      }
+      if (!state.activeLayer) state.activeLayer = L.layerGroup().addTo(map);
+
+      // Leaflet cannot fit a route into a box with no size, and quietly
+      // produces a broken view if asked to. Make sure it knows the real size.
+      map.invalidateSize();
+
       state.activeLayer.clearLayers();
 
       var bounds = [];
@@ -845,7 +872,7 @@
       // Shown so a rider can see that staying on leads somewhere useful. The
       // dashes say "not the recommendation"; the weight and white casing keep
       // it readable over the tiles, where a faint line simply disappeared.
-      if (option.kind === 'shuttle') {
+      if (option.kind === 'shuttle') safely('onward route', function () {
         var onward = onwardShape(option);
         if (onward.length > 1) {
           L.polyline(onward, {
@@ -866,10 +893,10 @@
             (n.walkMinutes != null
               ? '<br>then about ' + Math.round(n.walkMinutes) + ' min walk' : ''));
         });
-      }
+      });
 
       // --- the ridden stretch, in the route's colour ---
-      if (option.kind === 'shuttle') {
+      if (option.kind === 'shuttle') safely('bus route', function () {
         var ridden = riddenShape(option);
         if (ridden.length > 1) {
           // A white casing underneath makes the colour legible over any tile.
@@ -879,10 +906,12 @@
             color: option.route.colour, weight: 5, opacity: 1, lineJoin: 'round'
           }).addTo(state.activeLayer).bindPopup(
             option.route.name + (option.route.label ? ' · ' + option.route.label : ''));
-          drawDirectionArrows(L, ridden, state.activeLayer, 180);
           add(ridden);
+          safely('direction arrows', function () {
+            drawDirectionArrows(L, ridden, state.activeLayer, 180);
+          });
         }
-      }
+      });
 
       // --- walking legs, dashed, on real paths ---
       var walkColour = CFG.walkColour || '#1b7f4d';
@@ -897,12 +926,14 @@
         add(line);
       }
 
-      if (option.kind === 'walk') {
-        drawWalk(state.origin, state.destination);
-      } else {
-        drawWalk(state.origin, option.boardStop);
-        drawWalk(option.alightStop, state.destination);
-      }
+      safely('walking route', function () {
+        if (option.kind === 'walk') {
+          drawWalk(state.origin, state.destination);
+        } else {
+          drawWalk(state.origin, option.boardStop);
+          drawWalk(option.alightStop, state.destination);
+        }
+      });
 
       // --- markers ---
       function marker(p, label, colour, radius) {
@@ -914,25 +945,42 @@
         bounds.push([p.lat, p.lng]);
       }
 
-      if (option.kind === 'shuttle') {
-        marker(option.boardStop, 'Board here: ' + option.boardStop.name,
-               option.route.colour, 7);
-        marker(option.alightStop, 'Get off: ' + option.alightStop.name,
-               option.route.colour, 7);
-      }
-      // Hollow, like the start dot in the search box — the solid blue dot is
-      // reserved for where you are right now.
-      if (state.origin) {
-        L.circleMarker([state.origin.lat, state.origin.lng], {
-          radius: 6, color: '#1a73e8', weight: 3, fillColor: '#ffffff', fillOpacity: 1
-        }).addTo(state.activeLayer).bindPopup('Start: ' + state.origin.name);
-        bounds.push([state.origin.lat, state.origin.lng]);
-      }
-      marker(state.destination, 'Destination: ' + state.destination.name, '#d93025');
+      safely('stops', function () {
+        if (option.kind === 'shuttle') {
+          marker(option.boardStop, 'Board here: ' + option.boardStop.name,
+                 option.route.colour, 7);
+          marker(option.alightStop, 'Get off: ' + option.alightStop.name,
+                 option.route.colour, 7);
+        }
+        // Hollow, like the start dot in the search box — the solid blue dot
+        // is reserved for where you are right now.
+        if (state.origin) {
+          L.circleMarker([state.origin.lat, state.origin.lng], {
+            radius: 6, color: '#1a73e8', weight: 3, fillColor: '#ffffff', fillOpacity: 1
+          }).addTo(state.activeLayer).bindPopup('Start: ' + state.origin.name);
+          bounds.push([state.origin.lat, state.origin.lng]);
+        }
+        if (state.destination) {
+          marker(state.destination, 'Destination: ' + state.destination.name, '#d93025');
+        }
+      });
 
-      if (bounds.length) map.fitBounds(bounds, { padding: [35, 35] });
-      renderLegend(option);
-      setTimeout(function () { map.invalidateSize(); }, 0);
+      function fit() {
+        map.invalidateSize();
+        if (bounds.length) map.fitBounds(bounds, { padding: [35, 35], animate: false });
+      }
+      safely('zoom to the route', fit);
+      safely('legend', function () { renderLegend(option); });
+      // Again once the panel has settled into the page: on a phone the first
+      // measurement can come before layout, which fits the route into nothing.
+      setTimeout(function () { safely('zoom to the route', fit); }, 60);
+      setTimeout(function () { try { fit(); } catch (e) {} }, 400);
+
+      // Say so, rather than showing an empty map that looks like a working one.
+      if (problems.length) {
+        $('map-note').textContent = 'Part of this map could not be drawn (' +
+          problems.join('; ') + '). The written instructions above are unaffected.';
+      }
 
     }, function () {
       // Only a failure to LOAD the map hides it. A bug while drawing used to

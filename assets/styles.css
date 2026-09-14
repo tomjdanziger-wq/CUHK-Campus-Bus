@@ -731,9 +731,9 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .arrowmark__svg {
   display: block;
-  width: 15px;
-  height: 15px;
-  margin: -7.5px 0 0 -7.5px;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
   transform-origin: 50% 50%;
   filter: drop-shadow(0 0 1px rgba(0, 0, 0, .3));
 }

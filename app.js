@@ -808,17 +808,17 @@
         var onward = onwardShape(option);
         if (onward.length > 1) {
           L.polyline(onward, {
-            color: '#ffffff', weight: 9, opacity: 0.85, interactive: false
+            color: '#ffffff', weight: 6, opacity: 0.85, interactive: false
           }).addTo(state.activeLayer);
           L.polyline(onward, {
-            color: option.route.colour, weight: 5, opacity: 1,
-            dashArray: '10 8', lineCap: 'butt', interactive: false
+            color: option.route.colour, weight: 3.5, opacity: 1,
+            dashArray: '9 7', lineCap: 'butt', interactive: false
           }).addTo(state.activeLayer);
           add(onward);
         }
         (option.onwardStops || []).forEach(function (n) {
           L.circleMarker([n.stop.lat, n.stop.lng], {
-            radius: 6, color: option.route.colour, weight: 3,
+            radius: 5, color: option.route.colour, weight: 2.5,
             fillColor: '#fffdf8', fillOpacity: 1, opacity: 1
           }).addTo(state.activeLayer).bindPopup(
             '<strong>' + n.stop.name + '</strong><br>stay on for this stop' +
@@ -832,10 +832,10 @@
         var ridden = riddenShape(option);
         if (ridden.length > 1) {
           // A white casing underneath makes the colour legible over any tile.
-          L.polyline(ridden, { color: '#ffffff', weight: 12, opacity: 0.9 })
+          L.polyline(ridden, { color: '#ffffff', weight: 8, opacity: 0.9 })
             .addTo(state.activeLayer);
           L.polyline(ridden, {
-            color: option.route.colour, weight: 7, opacity: 1, lineJoin: 'round'
+            color: option.route.colour, weight: 5, opacity: 1, lineJoin: 'round'
           }).addTo(state.activeLayer).bindPopup(
             option.route.name + (option.route.label ? ' · ' + option.route.label : ''));
           drawDirectionArrows(L, ridden, state.activeLayer, 180);
@@ -850,7 +850,7 @@
         var line = walkLine(from, to);
         if (line.length < 2) return;
         L.polyline(line, {
-          color: walkColour, weight: 5, opacity: 0.95,
+          color: walkColour, weight: 4, opacity: 0.95,
           dashArray: '2 9', lineCap: 'round'
         }).addTo(state.activeLayer);
         add(line);
@@ -867,7 +867,7 @@
       function marker(p, label, colour, radius) {
         if (!p) return;
         L.circleMarker([p.lat, p.lng], {
-          radius: radius || 8, color: '#ffffff', weight: 3,
+          radius: radius || 7, color: '#ffffff', weight: 2.5,
           fillColor: colour, fillOpacity: 1
         }).addTo(state.activeLayer).bindPopup(label);
         bounds.push([p.lat, p.lng]);
@@ -875,9 +875,9 @@
 
       if (option.kind === 'shuttle') {
         marker(option.boardStop, 'Board here: ' + option.boardStop.name,
-               option.route.colour, 9);
+               option.route.colour, 7);
         marker(option.alightStop, 'Get off: ' + option.alightStop.name,
-               option.route.colour, 9);
+               option.route.colour, 7);
       }
       marker(state.origin, 'Start: ' + state.origin.name, '#1a73e8');
       marker(state.destination, 'Destination: ' + state.destination.name, '#d93025');
@@ -1065,12 +1065,12 @@
 
         var active = !only || only === route.id;
         if (active) {
-          L.polyline(shape.line, { color: '#fff', weight: 11, opacity: 0.9 })
+          L.polyline(shape.line, { color: '#fff', weight: 8, opacity: 0.9 })
             .addTo(state.netLayer);
         }
         L.polyline(shape.line, {
           color: route.colour,
-          weight: active ? 7 : 2.5,
+          weight: active ? 5 : 2.5,
           opacity: active ? 0.95 : 0.16,
           lineJoin: 'round'
         }).addTo(state.netLayer).bindPopup(
@@ -1154,7 +1154,8 @@
    *
    * Drawn as white chevrons sitting *on* the coloured line, the way transit
    * maps do it, rather than glyphs floating beside it. The line has to be
-   * thick enough to hold them, which is why the active route is drawn heavier.
+   * thick enough to hold them, so the chevrons are kept small rather than the
+   * line made heavy enough to bury everything else on the map.
    */
   function drawDirectionArrows(L, line, layer, spacing) {
     var carried = 0;

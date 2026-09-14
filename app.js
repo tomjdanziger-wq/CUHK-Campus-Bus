@@ -885,9 +885,11 @@
           add(onward);
         }
         (option.onwardStops || []).forEach(function (n) {
+          // Deliberately faint and small: these are "if you stayed on", and
+          // at full strength they looked just like the stop to get off at.
           L.circleMarker([n.stop.lat, n.stop.lng], {
-            radius: 5, color: option.route.colour, weight: 2.5,
-            fillColor: '#fffdf8', fillOpacity: 1, opacity: 1
+            radius: 3.5, color: option.route.colour, weight: 1.5,
+            fillColor: '#ffffff', fillOpacity: 0.7, opacity: 0.45
           }).addTo(state.activeLayer).bindPopup(
             '<strong>' + n.stop.name + '</strong><br>stay on for this stop' +
             (n.walkMinutes != null

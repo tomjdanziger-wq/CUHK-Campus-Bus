@@ -541,7 +541,14 @@
     time.appendChild(el('span', 'opt__time-unit', 'min travel'));
     time.appendChild(el('span', 'opt__arrive', o.arrivalLabel));
     head.appendChild(time);
+    head.appendChild(mapToggle(o));
     card.appendChild(head);
+
+    // The map opens right under the header, above the details — the way a
+    // maps app shows the route first and the steps after it.
+    var mapSlot = el('div', 'opt__mapslot');
+    attachMapPanel(o, mapSlot);
+    if (mapSlot.firstChild) card.appendChild(mapSlot);
 
     // --- the single most important field on the screen ---
     // The most common failure for a new student is waiting at the wrong stop.
@@ -675,8 +682,6 @@
       body.appendChild(flag('info', 'flag--info', n));
     });
 
-    body.appendChild(mapButton(o));
-    attachMapPanel(o, body);
     card.appendChild(body);
     return card;
   }
@@ -694,22 +699,24 @@
   }
 
   /**
-   * Selecting an option only changes what the map draws. It is not a
-   * commitment, and nothing is ever pre-selected on the user's behalf.
+   * The map icon at the end of an option's header, in the same place as on
+   * the walking row. Selecting an option only changes what the map draws. It
+   * is not a commitment, and nothing is ever pre-selected on the user's behalf.
    */
-  function mapButton(o) {
-    var pick = el('button', 'pick');
-    pick.type = 'button';
-    pick.appendChild(icon('map'));
-    pick.appendChild(el('span', null,
-      state.selectedKey === o.key ? 'Showing on map' : 'Show on map'));
-    pick.setAttribute('aria-pressed', String(state.selectedKey === o.key));
-    pick.addEventListener('click', function () {
-      state.selectedKey = state.selectedKey === o.key ? null : o.key;
+  function mapToggle(o) {
+    var selected = state.selectedKey === o.key;
+    var btn = el('button', 'maptoggle');
+    btn.type = 'button';
+    btn.setAttribute('aria-pressed', String(selected));
+    btn.setAttribute('aria-label', selected ? 'Hide map' : 'Show on map');
+    btn.title = selected ? 'Hide map' : 'Show on map';
+    btn.appendChild(icon('map'));
+    btn.addEventListener('click', function () {
+      state.selectedKey = selected ? null : o.key;
       render();
       if (state.selectedKey) showMapFor(o);
     });
-    return pick;
+    return btn;
   }
 
   function legRow(iconName, main, sub, timeText, extraClass) {
@@ -1177,23 +1184,36 @@
     if (oldNote) oldNote.textContent = '';
 
     loadLeaflet().then(function (L) {
-      if (!state.netMap) {
-        state.netMap = L.map(container, { scrollWheelZoom: false });
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19, attribution: '© OpenStreetMap contributors'
-        }).addTo(state.netMap);
-        state.netLayer = L.layerGroup().addTo(state.netMap);
-        attachLive(L, state.netMap);
+      // Same protection as the trip map: a failure in one part must not blank
+      // the rest, nor leave half-built state that breaks every later attempt.
+      var problems = [];
+      function safely(what, fn) {
+        try { fn(); } catch (err) {
+          problems.push(what + ': ' + (err && err.message || err));
+          if (window.console) console.error('Route map: ' + what + ' failed', err);
+        }
       }
 
+      if (!state.netMap) {
+        // Fractional zoom, so the whole network fills the map instead of
+        // sitting in its middle third at the nearest whole zoom level.
+        var created = L.map(container, { scrollWheelZoom: false, zoomSnap: 0.25 });
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19, attribution: '© OpenStreetMap contributors'
+        }).addTo(created);
+        state.netMap = created;
+        attachLive(L, created);
+      }
       var map = state.netMap;
+      if (!state.netLayer) state.netLayer = L.layerGroup().addTo(map);
+      map.invalidateSize();
       state.netLayer.clearLayers();
 
       var only = state.netRoute;
       var bounds = [];
 
       // --- route lines ---
-      DATA.routes.forEach(function (route) {
+      DATA.routes.forEach(function (route) { safely('Route ' + route.id, function () {
         var shape = DATA.routeShapes[route.id];
         if (!shape || !shape.line || shape.line.length < 2) return;
 
@@ -1214,10 +1234,10 @@
         if (active) {
           // Direction arrows only when one route is selected. Eight sets of
           // arrows overlapping each other tells you nothing.
-          if (only) drawDirectionArrows(L, shape.line, state.netLayer);
           shape.line.forEach(function (pt) { bounds.push(pt); });
+          if (only) drawDirectionArrows(L, shape.line, state.netLayer);
         }
-      });
+      }); });
 
       // --- stop markers ---
       var shown = {};
@@ -1226,7 +1246,7 @@
         route.stops.forEach(function (id) { shown[id] = true; });
       });
 
-      DATA.stops.forEach(function (stop) {
+      DATA.stops.forEach(function (stop) { safely('stop ' + stop.id, function () {
         var active = !only || shown[stop.id];
         if (only && !active) return;
 
@@ -1244,9 +1264,20 @@
           '<br>' + stop.elevation + ' m above sea level');
 
         if (!only) bounds.push([stop.lat, stop.lng]);
-      });
+      }); });
 
-      if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
+      // Fit now, and again once the page has finished sliding into view. On a
+      // phone the swipe to this page is still animating when the map is
+      // built, so the first measurement is of a map that is not on screen yet
+      // and the routes get fitted into a sliver.
+      function fit() {
+        map.invalidateSize();
+        if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], animate: false });
+      }
+      state.netFit = fit;
+      safely('zoom to the routes', fit);
+      setTimeout(function () { safely('zoom to the routes', fit); }, 80);
+      setTimeout(function () { safely('zoom to the routes', fit); }, 450);
 
       // Twenty-nine labelled pills on a campus-wide view overlap into an
       // unreadable pile, so they collapse to dots until there is room: either
@@ -1260,9 +1291,17 @@
         map.on('zoomend', syncNetworkLabels);
         state.netZoomBound = true;
       }
-      syncNetworkLabels();
+      safely('stop labels', syncNetworkLabels);
 
-      setTimeout(function () { map.invalidateSize(); syncNetworkLabels(); }, 0);
+      var note = $('network-map-note');
+      if (problems.length) {
+        if (!note) {
+          note = el('p', 'map-note');
+          note.id = 'network-map-note';
+          container.parentNode.insertBefore(note, container.nextSibling);
+        }
+        note.textContent = 'Part of this map could not be drawn (' + problems.join('; ') + ').';
+      }
 
     }, function () {
       // A note beside the map, not in place of it: replacing the container
@@ -1560,8 +1599,16 @@
       t.addEventListener('click', function () { goToPage(+t.dataset.page); });
     });
 
-    var pending = false;
+    var pending = false, settle = null;
     pager.addEventListener('scroll', function () {
+      // Once the swipe has come to rest, re-measure the route map. It was
+      // built while its page was still sliding in.
+      clearTimeout(settle);
+      settle = setTimeout(function () {
+        if (currentPage === PAGE_ROUTES && state.netFit) {
+          try { state.netFit(); } catch (e) { /* the map note already says */ }
+        }
+      }, 150);
       if (pending) return;
       pending = true;
       requestAnimationFrame(function () {

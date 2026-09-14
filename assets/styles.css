@@ -764,27 +764,26 @@ li + li > .results__map { border-top: 1px solid var(--line); }
 .flag--boxed { margin-left: 34px; padding: 8px 12px; border-radius: 8px; }
 .flag--danger.flag--boxed { background: var(--danger-soft); }
 
-/* A text button, the maps-app way. */
-.pick {
-  display: inline-flex;
+/* Map icon at the end of an option header, matching the walking row. Drawn
+   small, 44px to the touch. */
+.maptoggle {
+  flex-shrink: 0;
+  display: flex;
   align-items: center;
-  gap: 7px;
-  min-height: 34px;
-  margin: 2px 0 -4px -10px;
-  padding: 4px 12px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--accent-ink);
+  justify-content: center;
+  width: 36px;
+  height: 44px;
+  margin: -8px -10px -8px -4px;
+  padding: 0;
+  color: var(--accent);
   background: none;
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  position: relative;
 }
-.pick::after { content: ''; position: absolute; left: 0; right: 0; top: -4px; bottom: -4px; }
-.pick:hover { background: var(--accent-soft); }
-.pick[aria-pressed="true"] { background: var(--accent-soft); }
+.maptoggle .icon { width: 18px; height: 18px; }
+.maptoggle:hover { background: var(--accent-soft); }
+.maptoggle[aria-pressed="true"] { background: var(--accent-soft); }
 
 /* --- notice ------------------------------------------------------------- */
 
@@ -792,16 +791,19 @@ li + li > .results__map { border-top: 1px solid var(--line); }
 
 /* --- map ---------------------------------------------------------------- */
 
-.map-panel { margin: 10px 0 0 -34px; }
+.map-panel { margin: 10px 0 0; }
+.opt__mapslot .map-panel { margin: 10px 0 2px; }
 
 .map {
   height: 300px;
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--surface-2);
-  /* Its own stacking context. Without it, iOS Safari can drop the map's
-     vector and marker layers when an ancestor also clips with rounded
-     corners (the option list does), leaving only the tiles. */
+}
+/* The trip map sits inside the rounded, clipped option list. Its own stacking
+   context stops iOS Safari dropping the vector and marker layers there. Kept
+   off the route map, which is not clipped and does not need it. */
+#map {
   isolation: isolate;
   transform: translateZ(0);
 }

@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b3d5c">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#202124" media="(prefers-color-scheme: dark)">
   <meta name="description" content="Walk or take the shuttle? Compare campus shuttle routes and walking times at CUHK.">
   <title>CUHK Shuttle Helper</title>
   <link rel="stylesheet" href="assets/styles.css">
@@ -16,17 +17,6 @@
   <strong>Demo data.</strong>
   <span id="placeholder-banner-text"></span>
 </div>
-
-<!-- Three pages side by side: swipe right for the route map, left for food.
-     The tabs say where you are and work for anyone who cannot swipe. -->
-<nav class="tabs" role="tablist" aria-label="Sections">
-  <button id="tab-routes" class="tabs__tab" type="button" role="tab" data-page="0"
-          aria-controls="page-routes" aria-selected="false">Routes</button>
-  <button id="tab-trip" class="tabs__tab" type="button" role="tab" data-page="1"
-          aria-controls="page-trip" aria-selected="true">Walk or bus</button>
-  <button id="tab-food" class="tabs__tab" type="button" role="tab" data-page="2"
-          aria-controls="page-food" aria-selected="false">Food</button>
-</nav>
 
 <div id="pager" class="pager">
 
@@ -48,52 +38,65 @@
   <section id="page-trip" class="page" role="tabpanel" aria-labelledby="tab-trip">
 
     <section class="trip" aria-label="Choose your trip">
-      <div class="field">
-        <div class="field__head">
-          <label class="field__label" for="origin-input">From</label>
-          <div id="origin-quick" class="quick" role="group" aria-label="Quick start points"></div>
+      <!-- One card, start above destination, joined by a dotted line: the
+           shape everyone already knows from a maps app. -->
+      <div class="searchcard">
+        <div class="field">
+          <div class="field__row">
+            <span class="field__marker field__marker--from" aria-hidden="true"></span>
+            <label class="sr-only" for="origin-input">From</label>
+            <input id="origin-input" class="input" type="search" autocomplete="off"
+                   placeholder="Choose start, or use GPS"
+                   aria-describedby="origin-status" aria-autocomplete="list" role="combobox"
+                   aria-expanded="false" aria-controls="origin-results">
+            <button id="gps-btn" class="icon-btn" type="button" title="Use my location"
+                    aria-label="Use my current location">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A9 9 0 0 0 13 3.06V1h-2v2.06A9 9 0 0 0 3.06 11H1v2h2.06A9 9 0 0 0 11 20.94V23h2v-2.06A9 9 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/></svg>
+            </button>
+          </div>
+          <ul id="origin-results" class="results" role="listbox" hidden></ul>
         </div>
-        <div class="field__row">
-          <input id="origin-input" class="input" type="search" autocomplete="off"
-                 placeholder="Building, or use GPS"
-                 aria-describedby="origin-status" aria-autocomplete="list" role="combobox"
-                 aria-expanded="false" aria-controls="origin-results">
-          <button id="gps-btn" class="icon-btn" type="button" title="Use my location"
-                  aria-label="Use my current location">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A9 9 0 0 0 13 3.06V1h-2v2.06A9 9 0 0 0 3.06 11H1v2h2.06A9 9 0 0 0 11 20.94V23h2v-2.06A9 9 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/></svg>
-          </button>
-        </div>
-        <ul id="origin-results" class="results" role="listbox" hidden></ul>
-        <p id="origin-status" class="field__status" role="status"></p>
-        <div id="origin-confirm" class="confirm" hidden>
-          <p class="confirm__q">GPS on campus is unreliable. Nearest stop to you:</p>
-          <div id="origin-confirm-list" class="confirm__list"></div>
+
+        <div class="field">
+          <div class="field__row">
+            <span class="field__marker field__marker--to" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+            </span>
+            <label class="sr-only" for="dest-input">To</label>
+            <input id="dest-input" class="input" type="search" autocomplete="off"
+                   placeholder="Choose destination"
+                   aria-autocomplete="list" role="combobox" aria-expanded="false"
+                   aria-controls="dest-results">
+            <button id="swap-btn" class="icon-btn" type="button" title="Swap start and destination"
+                    aria-label="Swap origin and destination">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3 5 6.99h3V14h2V6.99h3L9 3z"/></svg>
+            </button>
+          </div>
+          <ul id="dest-results" class="results" role="listbox" hidden></ul>
         </div>
       </div>
 
-      <div class="field">
-        <div class="field__head">
-          <label class="field__label" for="dest-input">To</label>
-          <div id="dest-quick" class="quick" role="group" aria-label="Quick destinations"></div>
-        </div>
-        <div class="field__row">
-          <input id="dest-input" class="input" type="search" autocomplete="off"
-                 placeholder="e.g. United College, 科學館, canteen"
-                 aria-autocomplete="list" role="combobox" aria-expanded="false"
-                 aria-controls="dest-results">
-          <button id="swap-btn" class="icon-btn" type="button" title="Swap"
-                  aria-label="Swap origin and destination">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3 5 6.99h3V14h2V6.99h3L9 3z"/></svg>
+      <!-- Shortcuts on the left, where they are used every day; the departure
+           time on the right, where it stays out of the way until wanted. -->
+      <div class="shortcuts">
+        <div id="quick" class="shortcuts__picks" role="group" aria-label="Shortcuts"></div>
+        <div class="when">
+          <label class="chip chip--time" for="when-input">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z"/></svg>
+            <span id="when-label">Now</span>
+            <input id="when-input" class="when__input" type="time" aria-label="Departure time">
+          </label>
+          <button id="now-btn" class="when__now" type="button" aria-label="Leave now instead" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
           </button>
         </div>
-        <ul id="dest-results" class="results" role="listbox" hidden></ul>
-        <p id="dest-status" class="field__status" role="status"></p>
       </div>
 
-      <div class="when">
-        <label class="when__label" for="when-input">Leaving</label>
-        <input id="when-input" class="when__input" type="time" aria-label="Departure time">
-        <button id="now-btn" class="when__now" type="button">Now</button>
+      <p id="origin-status" class="field__status" role="status"></p>
+      <p id="dest-status" class="field__status" role="status"></p>
+      <div id="origin-confirm" class="confirm" hidden>
+        <p class="confirm__q">GPS on campus is unreliable. Nearest stop to you:</p>
+        <div id="origin-confirm-list" class="confirm__list"></div>
       </div>
     </section>
 
@@ -128,6 +131,26 @@
   </section>
 
 </div>
+
+<!-- Bottom navigation, where a thumb can reach it. Swiping between the pages
+     does the same thing; the bar says where you are. -->
+<nav class="tabs" role="tablist" aria-label="Sections">
+  <button id="tab-routes" class="tabs__tab" type="button" role="tab" data-page="0"
+          aria-controls="page-routes" aria-selected="false">
+    <span class="tabs__icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg></span>
+    <span class="tabs__label">Routes</span>
+  </button>
+  <button id="tab-trip" class="tabs__tab" type="button" role="tab" data-page="1"
+          aria-controls="page-trip" aria-selected="true">
+    <span class="tabs__icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21.71 11.29l-9-9a1 1 0 0 0-1.42 0l-9 9a1 1 0 0 0 0 1.42l9 9a1 1 0 0 0 1.42 0l9-9a1 1 0 0 0 0-1.42zM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5-3.5 3.5z"/></svg></span>
+    <span class="tabs__label">Go</span>
+  </button>
+  <button id="tab-food" class="tabs__tab" type="button" role="tab" data-page="2"
+          aria-controls="page-food" aria-selected="false">
+    <span class="tabs__icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg></span>
+    <span class="tabs__label">Food</span>
+  </button>
+</nav>
 
 <!-- Map. Illustrative only — the written instructions are the product. This
      panel is moved into whichever option is being shown, so the map opens

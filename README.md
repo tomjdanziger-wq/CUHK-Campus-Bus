@@ -478,9 +478,12 @@ The home is `config.lastBus.home` in `data/shuttle-data.js`. The logic is
 
 ## Browsing the network
 
-The app is three pages side by side — **Routes**, **Walk or bus**, **Food** —
-with the trip planner in the middle. Swipe right for the route map, left for
-food, or tap the tabs. It is one horizontal scroller with CSS scroll snapping,
+The app is three pages side by side — **Routes**, **Go**, **Food** — with the
+trip planner in the middle. Swipe right for the route map, left for food, or
+use the bottom navigation bar. The look follows Google Maps on purpose: a
+search card with start and destination joined by a dotted line, shortcut chips
+(I House 6, MTR) on the left beneath it, the departure time as a small chip on
+the right, and route numbers as coloured badges. It is one horizontal scroller with CSS scroll snapping,
 so the swipe is the browser's own gesture, and each page keeps its own scroll
 position. Nothing on screen exists only to expand something else.
 

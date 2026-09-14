@@ -205,10 +205,10 @@
 
     quickPicks: {
       from: [
-        { place: 'university-residence-nos-3', label: 'I House 6' }
+        { place: 'university-residence-nos-3', label: 'I House 6', icon: 'home' }
       ],
       to: [
-        { place: 'stop:univ-station', label: 'MTR' }
+        { place: 'stop:univ-station', label: 'MTR', icon: 'train' }
       ]
     },
 
@@ -218,19 +218,19 @@
     routeColours: {
       '1':  '#d1495b',   // Main Campus      — crimson
       '2':  '#0b6e99',   // NA / UC          — deep blue
-      '2S': '#4ea3d1',   // NA / UC (S)      — light blue
-      '3':  '#e07a1f',   // Shaw             — orange
+      '2S': '#2b87bd',   // NA / UC (S)      — light blue
+      '3':  '#c8610f',   // Shaw             — orange
       '4':  '#7b52ab',   // Campus Circuit   — purple
       '8':  '#00857a',   // Western Campus   — teal
       '5':  '#b5651d',   // Upward           — burnt orange
       '6A': '#7d5ba6',   // Downward (CWC)   — violet
-      '6B': '#a8869e',   // Downward (NA/UC) — muted mauve
+      '6B': '#8a6580',   // Downward (NA/UC) — muted mauve
       '7':  '#6b7a1f',   // Downward (Shaw)  — olive
       'N':  '#3f4e7a',   // Night Service    — indigo
       'H':  '#b5179e'    // Holidays Service — magenta
     },
     fallbackRouteColour: '#555f6b',
-    walkColour: '#1b7f4d',
+    walkColour: '#188038',
 
     // Capacity warnings. Static, not real-time — we have no occupancy data.
     peakPeriods: [

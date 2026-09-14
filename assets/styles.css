@@ -1,78 +1,87 @@
 /* ---------------------------------------------------------------------------
  * CUHK Shuttle Helper
  *
- * The design target is someone standing at a bus stop in bright Hong Kong
- * sunlight, holding the phone in one hand, in a hurry.
+ * Modelled on the maps app everyone already has on their phone: white cards on
+ * a pale grey ground, one blue for "you can act on this", rounded pill chips,
+ * route numbers as coloured badges. Familiar layout means nothing to learn
+ * while standing at a bus stop.
  *
- *   • Body text is 16px and times are 22px. Prose never drops below 13px;
- *     the only smaller type is the 12.5px uppercase labels, where the letter-
- *     spacing carries the legibility.
- *   • Every tappable thing is at least 44px tall, including the quiet ones
- *     that look like plain text.
+ * The design target is still someone in bright Hong Kong sunlight, holding the
+ * phone in one hand, in a hurry:
+ *
+ *   • Body text is 16px, times 22px. Prose never drops below 13px.
+ *   • Every tappable thing reaches 44px. Chips are drawn slimmer and extend
+ *     their touch area with ::after, so rows stay compact.
  *   • Contrast is high; subtle greys wash out outdoors.
  *   • Colour never carries meaning alone — there is always a word or icon.
+ *   • Navigation sits at the bottom, where a thumb reaches it.
  *
- * Space is spent on answers, not chrome. Rows sit close, labels share a line
- * with what they label, and the three sections are pages you swipe between
- * rather than panels you open — nothing on screen exists only to reveal
- * something else.
- *
- * The layout is a document, not a dashboard. Options are separated by hairline
- * rules rather than boxed into cards: a stack of bordered, rounded, shadowed
- * panels reads as chrome competing with the content, and there is very little
- * content here that is not a name or a number.
- *
- * Colour is reserved for information. Each shuttle route has a colour, and it
- * appears as a short bar beside that route's name and as its line on the map —
- * nowhere else. Warnings are amber. Everything else is ink on cream.
+ * Colour is reserved for information: route colours on badges and map lines,
+ * blue for actions and selection, amber for warnings, red only for boarding
+ * on the wrong side of the road.
  * ------------------------------------------------------------------------- */
 
 :root {
-  --page:        #f3efe5;   /* warm cream ground */
-  --surface:     #fffdf8;   /* the sheet the content sits on */
-  --surface-2:   #f6f1e6;   /* recessed: inputs, quiet buttons */
+  --page:        #f1f3f4;
+  --surface:     #ffffff;
+  --surface-2:   #f1f3f4;   /* recessed: inputs, hovered rows */
 
-  --ink:         #1c1a15;
-  --ink-2:       #46413a;
-  --ink-3:       #6b6355;
+  --ink:         #202124;
+  --ink-2:       #3c4043;
+  --ink-3:       #5f6368;
 
-  --line:        #e2dbcb;
-  --line-strong: #c3b9a4;
+  --line:        #e8eaed;
+  --line-strong: #dadce0;
 
-  --accent:      #1c1a15;   /* deliberately ink: nothing here needs a brand blue */
-  --walk:        #3f6b4f;
-  --warn:        #8a5a12;
-  --danger:      #96331f;
+  --accent:      #1a73e8;
+  --accent-ink:  #1967d2;
+  --accent-soft: #e8f0fe;
 
-  --radius:      3px;
+  --walk:        #188038;
+  --warn:        #b06000;
+  --warn-soft:   #fef7e0;
+  --danger:      #c5221f;
+  --danger-soft: #fce8e6;
+
+  --shadow-1: 0 1px 2px rgba(60, 64, 67, .3), 0 1px 3px 1px rgba(60, 64, 67, .15);
+  --shadow-2: 0 1px 3px rgba(60, 64, 67, .3), 0 4px 8px 3px rgba(60, 64, 67, .15);
+
+  --radius:      12px;
   --tap:         44px;
-  --gutter:      18px;
+  --gutter:      16px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --page:        #14120e;
-    --surface:     #1c1a15;
-    --surface-2:   #262319;
+    --page:        #17181a;
+    --surface:     #202124;
+    --surface-2:   #303134;
 
-    --ink:         #f3eee2;
-    --ink-2:       #cdc5b4;
-    --ink-3:       #968d7c;
+    --ink:         #e8eaed;
+    --ink-2:       #bdc1c6;
+    --ink-3:       #9aa0a6;
 
-    --line:        #322e25;
-    --line-strong: #514a3c;
+    --line:        #3c4043;
+    --line-strong: #5f6368;
 
-    --accent:      #f3eee2;
-    --walk:        #8fc9a2;
-    --warn:        #e0ac5c;
-    --danger:      #e89080;
+    --accent:      #8ab4f8;
+    --accent-ink:  #8ab4f8;
+    --accent-soft: rgba(138, 180, 248, .16);
+
+    --walk:        #81c995;
+    --warn:        #fdd663;
+    --warn-soft:   rgba(253, 214, 99, .12);
+    --danger:      #f28b82;
+    --danger-soft: rgba(242, 139, 130, .14);
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .5), 0 1px 3px 1px rgba(0, 0, 0, .3);
+    --shadow-2: 0 1px 3px rgba(0, 0, 0, .5), 0 4px 8px 3px rgba(0, 0, 0, .3);
   }
 }
 
 * { box-sizing: border-box; }
 
 html { -webkit-text-size-adjust: 100%; }
-
 html, body { height: 100%; }
 
 body {
@@ -84,71 +93,19 @@ body {
   overflow: hidden;
   background: var(--page);
   color: var(--ink);
-  font: 16px/1.4 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+  font: 16px/1.4 Roboto, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
         "Noto Sans", "PingFang HK", "Microsoft JhengHei", sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* --- pages -----------------------------------------------------------------
- *
- * One horizontal scroller, snapping a page at a time. `scroll-snap-stop`
- * keeps a hard flick from skipping straight past the middle page.
- * ----------------------------------------------------------------------- */
-
-.tabs {
-  flex: none;
-  display: flex;
-  width: 100%;
-  max-width: 620px;
-  margin: 0 auto;
-  padding-top: env(safe-area-inset-top);
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-  border-left: 1px solid var(--line);
-  border-right: 1px solid var(--line);
-}
-.tabs__tab {
-  flex: 1;
-  min-height: var(--tap);
-  padding: 0 6px;
-  font: inherit;
-  font-size: 14.5px;
-  font-weight: 600;
-  color: var(--ink-3);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  cursor: pointer;
-}
-.tabs__tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
-
-.pager {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  width: 100%;
-  max-width: 620px;
-  margin: 0 auto;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-  background: var(--surface);
-  border-left: 1px solid var(--line);
-  border-right: 1px solid var(--line);
-}
-.pager::-webkit-scrollbar { display: none; }
-
-.page {
-  flex: 0 0 100%;
-  min-width: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-  padding: 12px var(--gutter) calc(32px + env(safe-area-inset-bottom));
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .icon {
@@ -161,114 +118,271 @@ body {
 .icon svg { width: 100%; height: 100%; fill: currentColor; }
 .icon--mode { width: 22px; height: 22px; }
 
-:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* --- banners ------------------------------------------------------------ */
+button { -webkit-tap-highlight-color: transparent; }
+
+/* --- banner ------------------------------------------------------------- */
 
 .banner {
-  max-width: 620px;
-  margin: 0 auto;
   flex: none;
   width: 100%;
   padding: 8px var(--gutter);
   font-size: 14px;
   line-height: 1.45;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
 }
-.banner--danger { color: var(--danger); border-bottom-color: var(--danger); }
+.banner--danger { color: var(--danger); background: var(--danger-soft); }
 
-/* --- trip inputs -------------------------------------------------------- */
+/* --- pages ---------------------------------------------------------------
+ *
+ * One horizontal scroller, snapping a page at a time. `scroll-snap-stop`
+ * keeps a hard flick from skipping straight past the middle page.
+ * ----------------------------------------------------------------------- */
 
-.trip { padding: 0 0 12px; border-bottom: 1px solid var(--line); }
+.pager {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.pager::-webkit-scrollbar { display: none; }
 
-.field { position: relative; }
-.field + .field { margin-top: 8px; }
+.page {
+  flex: 0 0 100%;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  padding: calc(12px + env(safe-area-inset-top)) var(--gutter) 28px;
+}
 
-/* The label and the quick picks share a line: a row of its own for each
-   would push the results a full thumb's height further down. */
-.field__head {
+/* --- bottom navigation --------------------------------------------------- */
+
+.tabs {
+  flex: none;
+  display: flex;
+  width: 100%;
+  padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  box-shadow: 0 -1px 0 var(--line), 0 -2px 6px rgba(60, 64, 67, .08);
+  z-index: 5;
+}
+.tabs__tab {
+  flex: 1;
+  max-width: 200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+/* The selected section gets a tinted pill behind its icon. */
+.tabs__icon {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 30px;
-  margin-bottom: 3px;
+  justify-content: center;
+  width: 60px;
+  height: 30px;
+  border-radius: 999px;
+  transition: background-color .15s ease;
+}
+.tabs__icon svg { width: 22px; height: 22px; fill: currentColor; }
+.tabs__tab[aria-selected="true"] { color: var(--ink); font-weight: 600; }
+.tabs__tab[aria-selected="true"] .tabs__icon { color: var(--accent-ink); background: var(--accent-soft); }
+
+/* --- search card --------------------------------------------------------- */
+
+.trip { padding: 0 0 4px; }
+
+.searchcard {
+  position: relative;
+  padding: 4px 4px 4px 0;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-1);
 }
 
-.field__label {
-  display: block;
-  font-size: 12.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-3);
-}
+.field { position: relative; }
+.field + .field { border-top: 1px solid var(--line); margin-left: 48px; }
+.field + .field .field__row { margin-left: -48px; }
 
-.field__row { display: flex; gap: 8px; }
+.field__row { display: flex; align-items: center; }
+
+/* A hollow dot for the start and a red pin for the destination, joined by
+   a dotted line. */
+.field__marker {
+  flex: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: var(--tap);
+}
+.field__marker--from::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border: 3px solid var(--accent);
+  border-radius: 50%;
+}
+.field__marker--from::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 33px;
+  height: 22px;
+  border-left: 2px dotted var(--ink-3);
+  transform: translateX(-1px);
+}
+.field__marker--to svg { width: 20px; height: 20px; fill: #d93025; }
 
 .input {
   flex: 1;
   min-width: 0;
   min-height: var(--tap);
-  padding: 9px 12px;
-  font-size: 17px;
+  padding: 8px 4px;
+  font-size: 16px;
   font-family: inherit;
   color: var(--ink);
-  background: var(--surface-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  background: transparent;
+  border: none;
+  border-radius: 0;
   -webkit-appearance: none;
   appearance: none;
 }
 .input::placeholder { color: var(--ink-3); }
-.input:focus { background: var(--surface); border-color: var(--ink-2); outline: none; }
+.input:focus { outline: none; }
+.input::-webkit-search-cancel-button { display: none; }
 
 .icon-btn {
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: var(--tap);
-  min-height: var(--tap);
-  color: var(--ink-2);
-  background: var(--surface-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  width: var(--tap);
+  height: var(--tap);
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  border-radius: 50%;
   cursor: pointer;
 }
-.icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
+.icon-btn svg { width: 22px; height: 22px; fill: currentColor; }
+.icon-btn:hover { background: var(--surface-2); }
 .icon-btn:active { background: var(--line); }
-.icon-btn[aria-pressed="true"] { color: var(--ink); border-color: var(--ink-2); }
-
-.quick { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-.quick:empty { display: none; }
-/* Drawn at 30px so the label row stays slim; the ::after extends the touch
-   area to the full 44px. */
-.quick__btn {
-  position: relative;
-  min-height: 30px;
-  padding: 3px 11px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--ink-2);
-  background: var(--surface-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.quick__btn::after { content: ''; position: absolute; left: 0; right: 0; top: -7px; bottom: -7px; }
-.quick__btn:hover { color: var(--ink); border-color: var(--ink-2); }
-.quick__btn:active { background: var(--line); }
+.icon-btn[aria-pressed="true"] { color: var(--accent); }
 
 .field__status {
-  margin: 4px 0 0;
+  margin: 8px 4px 0;
   font-size: 14px;
   color: var(--ink-3);
 }
 .field__status:empty { display: none; }
 .field__status--ok  { color: var(--ink-2); }
 .field__status--err { color: var(--danger); }
+
+/* --- chips ----------------------------------------------------------------
+ *
+ * Every secondary control is one of these: shortcuts, filters, the time.
+ * Drawn at 34px, 44px to the touch.
+ * ----------------------------------------------------------------------- */
+
+.chips { display: flex; flex-wrap: wrap; gap: 10px 8px; margin-bottom: 12px; }
+
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.chip::after { content: ''; position: absolute; left: 0; right: 0; top: -5px; bottom: -5px; }
+.chip:hover { background: var(--surface-2); }
+.chip .icon, .chip > svg { width: 18px; height: 18px; fill: currentColor; color: var(--ink-3); }
+
+.chip[aria-pressed="true"] {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+.chip__dot { display: none; width: 10px; height: 10px; border-radius: 50%; background: var(--chip-colour); }
+.chip--colour .chip__dot { display: block; }
+.chip--colour[aria-pressed="true"] {
+  color: #fff;
+  background: var(--chip-colour);
+}
+.chip--colour[aria-pressed="true"] .chip__dot { background: #fff; }
+
+/* Shortcuts left, time right. */
+.shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.shortcuts__picks { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 10px 8px; }
+.chip--pick { box-shadow: var(--shadow-1); border-color: transparent; }
+.chip--pick .icon { color: var(--accent); }
+
+.when { flex: none; display: flex; align-items: center; }
+.chip--time { color: var(--ink-3); font-size: 13.5px; padding: 4px 11px; }
+/* The native time input sits invisibly over the chip, so a tap opens the
+   phone's own picker. */
+.when__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.when__now {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin-right: -8px;
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.when__now svg { width: 18px; height: 18px; fill: currentColor; }
+.when__now[hidden] { display: none; }
 
 /* --- autocomplete ------------------------------------------------------- */
 
@@ -277,24 +391,23 @@ body {
   position: absolute;
   z-index: 20;
   left: 0;
-  right: 0;
+  right: -4px;
   margin: 4px 0 0;
-  padding: 0;
+  padding: 6px 0;
   background: var(--surface);
-  border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   max-height: 360px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  box-shadow: 0 8px 24px rgba(28, 26, 21, .12);
+  box-shadow: var(--shadow-2);
 }
-.results li + li { border-top: 1px solid var(--line); }
+.field + .field .results { left: -48px; }
 
 .results button {
   display: block;
   width: 100%;
   min-height: var(--tap);
-  padding: 6px 12px;
+  padding: 7px 16px;
   text-align: left;
   font: inherit;
   color: var(--ink);
@@ -302,230 +415,129 @@ body {
   border: none;
   cursor: pointer;
 }
-.results button:hover, .results button:focus { background: var(--surface-2); }
+.results button:hover, .results button:focus { background: var(--surface-2); outline: none; }
 
-.results__name { font-size: 16px; font-weight: 500; }
+.results__name { font-size: 16px; }
 .results__zh   { display: inline-block; margin-left: 6px; font-size: 14px; color: var(--ink-3); }
 .results__tag {
   display: inline-block;
   margin-left: 6px;
-  font-size: 12px;
+  padding: 0 6px;
+  font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  vertical-align: 1px;
-  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  vertical-align: 2px;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  border-radius: 4px;
 }
 
 /* --- GPS confirmation --------------------------------------------------- */
 
-.confirm {
-  margin-top: 12px;
-  padding: 12px 0 0;
-  border-top: 1px solid var(--line);
-}
-.confirm__q { margin: 0 0 9px; font-size: 14px; color: var(--ink-2); }
+.confirm { margin-top: 10px; }
+.confirm__q { margin: 0 4px 8px; font-size: 14px; color: var(--ink-2); }
 .confirm__q strong { color: var(--ink); }
-.confirm__list { display: flex; flex-wrap: wrap; gap: 7px; }
+.confirm__list { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .confirm__btn {
   flex: 1 1 auto;
   min-height: var(--tap);
-  padding: 6px 11px;
+  padding: 6px 14px;
   font: inherit;
   font-size: 14px;
   text-align: left;
   color: var(--ink);
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   cursor: pointer;
 }
-.confirm__btn[aria-pressed="true"] { border-color: var(--ink); background: var(--surface); }
+.confirm__btn[aria-pressed="true"] { color: var(--accent-ink); background: var(--accent-soft); border-color: transparent; }
 .confirm__btn small { display: block; font-size: 12.5px; color: var(--ink-3); }
 
-/* --- departure time ----------------------------------------------------- */
+/* --- options ------------------------------------------------------------- */
 
-.when { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-.when__label {
-  font-size: 12.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-3);
-}
-.when__input {
-  min-height: var(--tap);
-  padding: 5px 9px;
-  font: inherit;
-  font-size: 16px;
-  color: var(--ink);
-  background: var(--surface-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-}
-.when__now {
-  min-height: var(--tap);
-  padding: 5px 12px;
-  font: inherit;
-  font-size: 14px;
-  color: var(--ink-2);
-  background: none;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.when__now:hover { color: var(--ink); border-color: var(--ink-2); }
-
-/* --- network browser ---------------------------------------------------- */
-
-.chips { display: flex; flex-wrap: wrap; gap: 8px 6px; margin-bottom: 10px; }
-
-/* 34px drawn, 44px to the touch, like the quick picks. */
-.chip {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 3px 11px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink-2);
-  background: var(--surface-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.chip::after { content: ''; position: absolute; left: 0; right: 0; top: -5px; bottom: -5px; }
-.chip__dot { display: none; width: 9px; height: 9px; background: var(--chip-colour); }
-.chip--colour .chip__dot { display: block; }
-.chip[aria-pressed="true"] {
-  color: var(--surface);
-  background: var(--ink);
-  border-color: var(--ink);
-}
-.chip--colour[aria-pressed="true"] {
-  color: #fff;
-  background: var(--chip-colour);
-  border-color: var(--chip-colour);
-}
-.chip[aria-pressed="true"] .chip__dot { background: rgba(255, 255, 255, .9); }
-
-.network__summary { margin: 10px 0 0; font-size: 14.5px; line-height: 1.45; color: var(--ink-2); }
-.network__note { display: block; margin-top: 6px; color: var(--warn); font-size: 13.5px; }
-
-.stoplist { list-style: none; margin: 8px 0 0; padding: 0; }
-.stoplist__item {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 5px 0;
-}
-.stoplist__item + .stoplist__item { border-top: 1px solid var(--line); }
-.stoplist__code {
-  flex-shrink: 0;
-  min-width: 46px;
-  padding: 2px 6px;
-  font-size: 12px;
-  font-weight: 700;
-  text-align: center;
-  color: #fff;
-  background: var(--route-colour, var(--ink-3));
-  border-radius: 2px;
-}
-.stoplist__text { flex: 1; min-width: 0; }
-.stoplist__name { font-size: 15.5px; font-weight: 500; }
-.stoplist__zh { display: inline-block; margin-left: 6px; font-size: 13.5px; color: var(--ink-3); }
-.stoplist__meta { flex-shrink: 0; font-size: 12.5px; color: var(--ink-3); }
-
-/* --- notice --- */
-
-.notice {
-  margin: 10px 0 0;
-  font-size: 14px;
-  color: var(--ink-3);
+#options:not(:empty) {
+  margin-top: 14px;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
 }
 
-/* --- options ------------------------------------------------------------
- *
- * A continuous list divided by rules, not a stack of boxes. The route colour
- * appears once per option, as a short bar beside the name.
- * ----------------------------------------------------------------------- */
+.opt { padding: 14px 16px; }
+.opt + .opt, .opt + .notice { border-top: 1px solid var(--line); }
 
-#options { margin-top: 0; }
-
-.opt { padding: 12px 0; border-top: 1px solid var(--line); }
-.opt:first-of-type { border-top: none; }
-
-.opt__head { display: flex; align-items: baseline; gap: 10px; }
-
-.opt__head .icon--mode {
-  align-self: center;
-  color: var(--ink-3);
-}
-.opt--walk .icon--mode { color: var(--ink-3); }
+.opt__head { display: flex; align-items: flex-start; gap: 12px; }
+.opt__head .icon--mode { margin-top: 2px; color: var(--ink-3); }
 
 .opt__titles { flex: 1; min-width: 0; }
 .opt__mode {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   margin: 0;
   font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 500;
 }
-/* The one place a route's colour appears in the list. */
-.opt--bus .opt__mode::before {
-  content: '';
-  width: 3px;
-  height: 15px;
-  flex-shrink: 0;
-  background: var(--route-stripe, var(--route-colour, var(--ink-3)));
+.opt--walk .opt__mode { font-weight: 500; }
+.opt__mode-sub { display: block; margin-top: 2px; font-size: 14px; color: var(--ink-3); }
+
+/* Route number as a coloured badge. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 7px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: var(--route-colour, var(--ink-3));
+  border-radius: 6px;
 }
-.opt__mode-sub { display: block; margin-top: 1px; font-size: 13.5px; color: var(--ink-3); }
 
 .opt__time { text-align: right; flex-shrink: 0; }
 .opt__time-range {
   font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 500;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+.opt--best .opt__time-range { color: var(--walk); }
 .opt__time-unit { font-size: 13px; color: var(--ink-3); margin-left: 3px; }
 .opt__arrive {
   display: block;
-  margin-top: 2px;
+  margin-top: 1px;
   font-size: 13.5px;
-  color: var(--ink-2);
+  color: var(--ink-3);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
+.opt__body { margin-left: 34px; }
+
 /* The single most important line on the screen: which stop to stand at. */
-.board { margin-top: 8px; }
+.board { margin: 10px 0 0 34px; }
 .board__label {
-  margin: 0 0 2px;
+  margin: 0;
   font-size: 12.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.11em;
+  font-weight: 500;
   color: var(--ink-3);
 }
-.board__name { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.25; }
+.board__name { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.25; }
 .board__zh { display: inline-block; margin-left: 6px; font-size: 15px; font-weight: 400; color: var(--ink-2); }
 .board__walk { margin: 1px 0 0; font-size: 14px; color: var(--ink-3); }
-.board__side { margin: 0; font-size: 13.5px; color: var(--ink-3); font-style: italic; }
+.board__side { margin: 0; font-size: 13.5px; color: var(--ink-3); }
 
-.opt__body { margin-top: 2px; }
-
-/* --- the wait -----------------------------------------------------------
+/* --- the wait ------------------------------------------------------------
  *
- * Deliberately given its own row rather than folded into the headline or
- * buried among the legs. It is the number most likely to change someone's
- * mind, and the one an "average wait" would quietly lie about.
+ * Its own row rather than folded into the headline. It is the number most
+ * likely to change someone's mind, and the one an "average wait" would
+ * quietly lie about.
  * ----------------------------------------------------------------------- */
 
 .waitline {
@@ -533,39 +545,57 @@ body {
   align-items: flex-start;
   gap: 8px;
   margin: 8px 0 0;
-  padding: 5px 10px;
   font-size: 15px;
   color: var(--ink);
-  background: var(--surface-2);
-  border-left: 2px solid var(--warn);
 }
-.waitline .icon { margin-top: 3px; color: var(--warn); }
+.waitline .icon { margin-top: 2px; color: var(--accent); }
 .waitline__text { flex: 1; min-width: 0; }
-.waitline strong { color: var(--warn); font-weight: 600; }
+.waitline strong { color: var(--accent-ink); font-weight: 600; }
 .waitline__arrive {
   display: block;
-  margin-top: 0;
   font-size: 13.5px;
-  color: var(--ink-2);
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
 
-/* --- where the bus carries on ------------------------------------------
- *
- * The planner already weighed these and picked the best by arrival time, but
- * its walking model is an estimate over an imperfectly mapped campus. Anyone
- * who knows the ground can overrule it here.
- * ----------------------------------------------------------------------- */
+/* --- leg breakdown ------------------------------------------------------ */
 
-.onward { margin-top: 8px; }
-.onward__label {
-  margin: 0 0 1px;
-  font-size: 12.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.11em;
-  color: var(--ink-3);
+.legs { list-style: none; margin: 6px 0 0; padding: 0; }
+.legs li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 15px;
 }
+.leg__icon { color: var(--ink-3); align-self: center; }
+.leg__text { flex: 1; min-width: 0; }
+.leg__label { font-weight: 500; }
+.leg__sub { margin-left: 5px; font-size: 13.5px; color: var(--ink-3); }
+.leg__time { flex-shrink: 0; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+/* --- departures --------------------------------------------------------- */
+
+.deps { margin: 6px 0 0; }
+.deps__label { display: block; font-size: 12.5px; font-weight: 500; color: var(--ink-3); }
+.deps__times {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.deps__time { font-size: 15.5px; font-weight: 500; }
+.deps__time--tagged {
+  border-bottom: 3px solid var(--route-colour, transparent);
+  padding-bottom: 0;
+}
+.deps__sep { color: var(--line-strong); }
+
+/* --- where the bus carries on ------------------------------------------- */
+
+.onward { margin-top: 6px; }
+.onward__label { margin: 0; font-size: 12.5px; font-weight: 500; color: var(--ink-3); }
 .onward__list { list-style: none; margin: 0; padding: 0; }
 .onward__list li {
   display: flex;
@@ -576,55 +606,11 @@ body {
   font-size: 14.5px;
   color: var(--ink-3);
 }
-.onward__list li + li { border-top: 1px dotted var(--line); }
 .onward__stop { min-width: 0; }
 .onward__walk { flex-shrink: 0; font-size: 13.5px; }
-/* A later stop that leaves you meaningfully closer on foot. The ranking
-   prefers arriving sooner; someone facing a climb in August may not. */
+/* A later stop that leaves you meaningfully closer on foot. */
 .onward__item--closer { color: var(--ink); }
 .onward__item--closer .onward__walk { font-weight: 600; }
-
-/* --- leg breakdown ------------------------------------------------------ */
-
-.legs { list-style: none; margin: 6px 0 0; padding: 0; }
-.legs li {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 2px 0;
-  font-size: 15px;
-}
-.leg__icon { color: var(--ink-3); align-self: center; }
-.leg__text { flex: 1; min-width: 0; }
-.leg__label { font-weight: 500; }
-.leg__sub { margin-left: 5px; font-size: 13.5px; color: var(--ink-3); }
-.leg__time { flex-shrink: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
-
-/* --- departures --------------------------------------------------------- */
-
-.deps { margin: 6px 0 0; }
-.deps__label {
-  display: block;
-  font-size: 12.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.11em;
-  color: var(--ink-3);
-  margin-bottom: 0;
-}
-.deps__times {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  font-variant-numeric: tabular-nums;
-}
-.deps__time { font-size: 16px; font-weight: 500; }
-.deps__time--tagged {
-  border-bottom: 2px solid var(--route-colour, transparent);
-  padding-bottom: 1px;
-}
-.deps__sep { color: var(--line-strong); }
 
 /* --- flags -------------------------------------------------------------- */
 
@@ -633,73 +619,71 @@ body {
   align-items: flex-start;
   gap: 8px;
   margin: 8px 0 0;
-  padding-left: 11px;
-  border-left: 2px solid var(--line-strong);
   font-size: 14px;
-  line-height: 1.45;
-  color: var(--ink-2);
+  line-height: 1.4;
+  color: var(--ink-3);
 }
-.flag .icon { margin-top: 2px; color: var(--ink-3); }
-.flag--warn, .flag--climb { border-left-color: var(--warn); color: var(--warn); }
-.flag--warn .icon, .flag--climb .icon { color: var(--warn); }
+.flag .icon { margin-top: 1px; }
+.flag--warn, .flag--climb { color: var(--warn); }
 
 /* Red, and the only red in the interface: boarding on the wrong side of the
-   road here does not cost you a couple of minutes, it sends you round the
-   entire campus. */
-.flag--danger { border-left-color: var(--danger); color: var(--danger); }
-.flag--danger .icon { color: var(--danger); }
-.flag--boxed { padding: 6px 10px; background: var(--surface-2); }
+   road here does not cost a couple of minutes, it sends you round the whole
+   campus. */
+.flag--danger { color: var(--danger); }
+.flag--boxed { margin-left: 34px; padding: 8px 12px; border-radius: 8px; }
+.flag--danger.flag--boxed { background: var(--danger-soft); }
 
+/* A text button, the maps-app way. */
 .pick {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: var(--tap);
-  margin-top: 8px;
-  padding: 6px 13px;
+  min-height: 36px;
+  margin: 8px 0 0 -10px;
+  padding: 4px 12px;
   font: inherit;
   font-size: 14px;
   font-weight: 500;
-  color: var(--ink-2);
+  color: var(--accent-ink);
   background: none;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  border: none;
+  border-radius: 999px;
   cursor: pointer;
+  position: relative;
 }
-.pick:hover { color: var(--ink); border-color: var(--ink-2); }
-.pick[aria-pressed="true"] { color: var(--ink); background: var(--surface-2); border-color: var(--ink-2); }
+.pick::after { content: ''; position: absolute; left: 0; right: 0; top: -4px; bottom: -4px; }
+.pick:hover { background: var(--accent-soft); }
+.pick[aria-pressed="true"] { background: var(--accent-soft); }
 
-/* --- map ----------------------------------------------------------------
- *
- * One map panel, moved into whichever option is being shown, so it opens
- * directly beneath that card rather than somewhere further down the page.
- * ----------------------------------------------------------------------- */
+/* --- notice ------------------------------------------------------------- */
 
-.map-panel { margin-top: 8px; }
+.notice { margin: 0; padding: 12px 16px; font-size: 14px; color: var(--ink-3); }
 
+/* --- map ---------------------------------------------------------------- */
+
+.map-panel { margin: 10px 0 0 -34px; }
 
 .map {
   height: 300px;
-  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
   background: var(--surface-2);
 }
-.map--network { height: 52vh; min-height: 260px; margin-top: 0; }
-.map-note { margin: 8px 0 0; font-size: 13px; color: var(--ink-3); }
+.map--network { height: 52vh; min-height: 260px; box-shadow: var(--shadow-1); }
+.map-note { margin: 6px 0 0; font-size: 13px; color: var(--ink-3); }
 
 .leaflet-container { font: inherit; background: var(--surface-2); }
 
-/* Mute the basemap. OpenStreetMap's default tiles are colourful enough to
-   compete with the route lines drawn on top, and the route is the point.
-   Leaflet sets `filter` on tiles itself while they fade in, so this needs to
-   be at least as specific and marked important to survive. */
+/* Soften the basemap a little, so route lines read first. Leaflet sets
+   `filter` on tiles while they fade in, hence !important. */
 .map .leaflet-tile,
 .map .leaflet-tile-loaded {
-  filter: saturate(0.32) brightness(1.05) contrast(0.92) sepia(0.12) !important;
+  filter: saturate(0.55) brightness(1.03) !important;
 }
 @media (prefers-color-scheme: dark) {
   .map .leaflet-tile,
   .map .leaflet-tile-loaded {
-    filter: saturate(0.3) brightness(0.76) contrast(1.06) !important;
+    filter: saturate(0.4) brightness(0.72) contrast(1.08) !important;
   }
 }
 
@@ -712,9 +696,9 @@ body {
 }
 .legend__item { display: flex; align-items: center; gap: 7px; color: var(--ink-2); }
 .legend__item--muted { color: var(--ink-3); }
-.legend__swatch { width: 20px; height: 4px; flex-shrink: 0; }
-.legend__swatch--dashed { width: 26px; height: 0; border-top: 5px dashed currentColor; }
-.legend__swatch--dotted { height: 0; border-top: 4px dotted currentColor; }
+.legend__swatch { width: 20px; height: 4px; flex-shrink: 0; border-radius: 2px; }
+.legend__swatch--dashed { width: 26px; height: 0; border-top: 5px dashed currentColor; border-radius: 0; }
+.legend__swatch--dotted { height: 0; border-top: 4px dotted currentColor; border-radius: 0; }
 
 /* --- map overlays -------------------------------------------------------- */
 
@@ -722,27 +706,26 @@ body {
 
 .stopmark__dot {
   position: absolute;
-  width: 9px;
-  height: 9px;
-  margin: -4.5px 0 0 -4.5px;
-  background: #fffdf8;
-  border: 2px solid #1c1a15;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  background: #fff;
+  border: 2px solid #202124;
   border-radius: 50%;
 }
 
-/* The label sits beside the dot, not on it. Stops here are close together,
-   and centred labels pile into an unreadable stack. */
+/* The label sits beside the dot, not on it: stops here are close together. */
 .stopmark__pill {
   position: absolute;
   left: 8px;
-  top: -7px;
-  padding: 1px 4px;
-  font: 600 10.5px/1.35 ui-sans-serif, -apple-system, sans-serif;
+  top: -8px;
+  padding: 1px 5px;
+  font: 600 11px/1.35 Roboto, ui-sans-serif, -apple-system, sans-serif;
   white-space: nowrap;
-  color: #1c1a15;
-  background: rgba(255, 253, 248, .93);
-  border: 1px solid rgba(28, 26, 21, .45);
-  border-radius: 2px;
+  color: #202124;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, .45);
 }
 .map--network.labels-off .stopmark__pill { display: none; }
 
@@ -755,36 +738,59 @@ body {
   filter: drop-shadow(0 0 1px rgba(0, 0, 0, .3));
 }
 
-/* --- footer ------------------------------------------------------------- */
+/* --- network browser ---------------------------------------------------- */
 
-.footer {
-  margin-top: 28px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-  color: var(--ink-3);
-  font-size: 13px;
-  line-height: 1.55;
+.network__summary { margin: 12px 4px 0; font-size: 14.5px; line-height: 1.45; color: var(--ink-2); }
+.network__note { display: block; margin-top: 6px; color: var(--warn); font-size: 13.5px; }
+
+.stoplist {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 4px 16px;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-1);
 }
-.footer p { margin: 0 0 10px; }
-.footer__validity { color: var(--ink-2); font-size: 13.5px; }
-.footer strong { color: var(--ink-2); font-weight: 600; }
-
-@media (min-width: 560px) {
-  :root { --gutter: 28px; }
+.stoplist[hidden] { display: none; }
+.stoplist__item { display: flex; align-items: center; gap: 12px; padding: 7px 0; }
+.stoplist__item + .stoplist__item { border-top: 1px solid var(--line); }
+.stoplist__code {
+  flex-shrink: 0;
+  min-width: 48px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  color: #fff;
+  background: var(--route-colour, var(--ink-3));
+  border-radius: 6px;
 }
+.stoplist__text { flex: 1; min-width: 0; }
+.stoplist__name { font-size: 15.5px; }
+.stoplist__zh { display: inline-block; margin-left: 6px; font-size: 13.5px; color: var(--ink-3); }
+.stoplist__meta { flex-shrink: 0; font-size: 12.5px; color: var(--ink-3); }
 
-/* --- food browser -------------------------------------------------------- */
+/* --- food list ------------------------------------------------------------ */
 
-.foodlist { list-style: none; margin: 8px 0 0; padding: 0; }
+.foodlist {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+.foodlist:empty { display: none; }
 .foodlist__item + .foodlist__item { border-top: 1px solid var(--line); }
 
 .foodlist__btn {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   width: 100%;
   min-height: var(--tap);
-  padding: 6px 0;
+  padding: 9px 16px;
   font: inherit;
   text-align: left;
   color: var(--ink);
@@ -805,35 +811,41 @@ body {
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
-.foodlist__dist strong { display: block; font-size: 15px; color: var(--ink); font-weight: 600; }
+.foodlist__dist strong { display: block; font-size: 15px; color: var(--ink); font-weight: 500; }
 
 /* --- last bus -------------------------------------------------------------- */
 
-.lastbus { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
-.lastbus__title {
-  margin: 0 0 4px;
-  font-size: 12.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-3);
+.lastbus {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-1);
 }
+.lastbus__title { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
 .lastbus__list { list-style: none; margin: 0; padding: 0; }
-.lastbus__row { display: flex; align-items: baseline; gap: 10px; padding: 3px 0; }
-.lastbus__route {
-  flex-shrink: 0;
-  min-width: 30px;
-  padding: 0 5px;
-  font-size: 13px;
-  font-weight: 700;
-  text-align: center;
-  color: #fff;
-  background: var(--route-colour, var(--ink-3));
-  border-radius: 2px;
-}
+.lastbus__row { display: flex; align-items: flex-start; gap: 12px; padding: 4px 0; }
+.lastbus__row .badge { margin-top: 1px; }
 .lastbus__text { flex: 1; min-width: 0; font-size: 15px; }
 .lastbus__time { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .lastbus__sub { display: block; font-size: 13.5px; color: var(--ink-3); }
 .lastbus__none { margin: 0; font-size: 15px; color: var(--ink-2); }
 .lastbus__none--gone { color: var(--danger); }
-.lastbus__other { margin: 4px 0 0; font-size: 13.5px; color: var(--ink-3); }
+.lastbus__other { margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink-3); }
+
+/* --- footer ------------------------------------------------------------- */
+
+.footer {
+  margin-top: 24px;
+  padding: 0 4px;
+  color: var(--ink-3);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.footer p { margin: 0 0 10px; }
+.footer__validity { color: var(--ink-2); font-size: 13.5px; }
+.footer strong { color: var(--ink-2); font-weight: 600; }
+
+@media (min-width: 560px) {
+  :root { --gutter: 24px; }
+}

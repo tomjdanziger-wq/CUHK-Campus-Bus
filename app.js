@@ -59,6 +59,8 @@
     trend: 'M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6h-6z',
     map:   'M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z',
     swap:  'M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z',
+    home:  'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+    train: 'M12 2c-4 0-8 .5-8 4v9.5A3.5 3.5 0 0 0 7.5 19L6 20.5v.5h2.23l2-2H14l2 2h2v-.5L16.5 19a3.5 3.5 0 0 0 3.5-3.5V6c0-3.5-3.58-4-8-4zM7.5 17a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3.5-7H6V6h5v4zm2 0V6h5v4h-5zm3.5 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
     gps:   'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A9 9 0 0 0 13 3.06V1h-2v2.06A9 9 0 0 0 3.06 11H1v2h2.06A9 9 0 0 0 11 20.94V23h2v-2.06A9 9 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z'
   };
 
@@ -202,16 +204,18 @@
    * `config.quickPicks` rather than hard-coded, since whose home this is
    * depends on who is using it.
    */
-  function renderQuickPicks(containerId, inputId, picks, onPick) {
-    var box = $(containerId);
-    box.innerHTML = '';
+  function renderQuickPicks(inputId, picks, onPick, verb) {
+    var box = $('quick');
     (picks || []).forEach(function (pick) {
       var place = DATA.places.filter(function (p) { return p.id === pick.place; })[0];
       if (!place) return;   // an id that no longer exists just disappears
 
-      var btn = el('button', 'quick__btn', pick.label || place.name);
+      var btn = el('button', 'chip chip--pick');
       btn.type = 'button';
-      btn.title = place.name + (place.nameZh ? ' ' + place.nameZh : '');
+      if (pick.icon && ICON_PATHS[pick.icon]) btn.appendChild(icon(pick.icon));
+      btn.appendChild(el('span', null, pick.label || place.name));
+      btn.title = verb + ' ' + place.name + (place.nameZh ? ' ' + place.nameZh : '');
+      btn.setAttribute('aria-label', btn.title);
       btn.addEventListener('click', function () {
         $(inputId).value = place.name;
         onPick(place);
@@ -445,6 +449,13 @@
     return card;
   }
 
+  function routeBadge(route) {
+    var b = el('span', 'badge', route.id);
+    b.style.setProperty('--route-colour', route.colour);
+    b.setAttribute('aria-hidden', 'true');
+    return b;
+  }
+
   /** "1, 2 or 4" — how someone would actually say it out loud. */
   function joinList(items) {
     if (items.length <= 1) return items.join('');
@@ -463,24 +474,19 @@
     var card = el('div', 'opt opt--bus' + (o.isBest ? ' opt--best' : ''));
     card.style.setProperty('--route-colour', o.route.colour);
 
-    // A grouped option carries several routes, so the edge stripe blends their
-    // colours rather than picking a winner among equals.
-    if (routes.length > 1) {
-      var stops = routes.map(function (r, i) {
-        return r.colour + ' ' + Math.round(i * 100 / routes.length) + '% ' +
-               Math.round((i + 1) * 100 / routes.length) + '%';
-      });
-      card.style.setProperty('--route-stripe', 'linear-gradient(180deg,' + stops.join(',') + ')');
-    }
-
     // --- header ---
     var head = el('div', 'opt__head');
     head.appendChild(icon('bus', 'icon--mode'));
 
+    // Route numbers as coloured badges, the way transit maps and maps apps
+    // show them: the colour identifies the line, the number names it.
     var titles = el('div', 'opt__titles');
-    titles.appendChild(el('h2', 'opt__mode',
+    var modeLine = el('h2', 'opt__mode');
+    modeLine.setAttribute('aria-label',
       routes.length > 1 ? 'Route ' + joinList(routes.map(function (r) { return r.id; }))
-                        : o.route.name));
+                        : o.route.name);
+    routes.forEach(function (r) { modeLine.appendChild(routeBadge(r)); });
+    titles.appendChild(modeLine);
     titles.appendChild(el('span', 'opt__mode-sub',
       routes.length > 1
         ? 'whichever comes first'
@@ -873,8 +879,8 @@
         marker(option.alightStop, 'Get off: ' + option.alightStop.name,
                option.route.colour, 9);
       }
-      marker(state.origin, 'Start: ' + state.origin.name, walkColour);
-      marker(state.destination, 'Destination: ' + state.destination.name, '#a11919');
+      marker(state.origin, 'Start: ' + state.origin.name, '#1a73e8');
+      marker(state.destination, 'Destination: ' + state.destination.name, '#d93025');
 
       if (bounds.length) map.fitBounds(bounds, { padding: [35, 35] });
       renderLegend(option);
@@ -1482,7 +1488,7 @@
       upcoming.slice(0, 3).forEach(function (r) {
         var li = el('li', 'lastbus__row');
         li.style.setProperty('--route-colour', r.route.colour);
-        li.appendChild(el('span', 'lastbus__route', r.route.id));
+        li.appendChild(routeBadge(r.route));
         var text = el('span', 'lastbus__text');
         text.appendChild(el('strong', 'lastbus__time', r.boardTime));
         text.appendChild(document.createTextNode(
@@ -1537,8 +1543,8 @@
     wireAutocomplete('origin-input', 'origin-results', pickOrigin);
     wireAutocomplete('dest-input', 'dest-results', pickDestination);
 
-    renderQuickPicks('origin-quick', 'origin-input', CFG.quickPicks && CFG.quickPicks.from, pickOrigin);
-    renderQuickPicks('dest-quick', 'dest-input', CFG.quickPicks && CFG.quickPicks.to, pickDestination);
+    renderQuickPicks('origin-input', CFG.quickPicks && CFG.quickPicks.from, pickOrigin, 'Start from');
+    renderQuickPicks('dest-input', CFG.quickPicks && CFG.quickPicks.to, pickDestination, 'Go to');
 
     $('gps-btn').addEventListener('click', requestGps);
 
@@ -1560,19 +1566,34 @@
       recompute();
     });
 
+    // The departure time is a small chip, not a form row: nearly every trip
+    // is "now", so it should cost no space until someone wants it.
+    function syncWhen() {
+      $('when-label').textContent = state.when
+        ? planner.formatHHMM(planner.minutesSinceMidnight(state.when)) : 'Now';
+      $('now-btn').hidden = !state.when;
+    }
+
+    $('when-input').addEventListener('click', function () {
+      // Desktop browsers only open the picker from their own tiny icon.
+      try { this.showPicker(); } catch (e) { /* not supported; typing works */ }
+    });
+
     $('when-input').addEventListener('change', function (e) {
       var v = e.target.value;
-      if (!v) { state.when = null; recompute(); return; }
+      if (!v) { state.when = null; syncWhen(); recompute(); return; }
       var parts = v.split(':');
       var d = new Date();
       d.setHours(+parts[0], +parts[1], 0, 0);
       state.when = d;
+      syncWhen();
       recompute();
     });
 
     $('now-btn').addEventListener('click', function () {
       state.when = null;
       $('when-input').value = '';
+      syncWhen();
       recompute();
     });
 

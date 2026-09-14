@@ -465,44 +465,70 @@ button { -webkit-tap-highlight-color: transparent; }
   overflow: hidden;
 }
 
-.opt { padding: 14px 16px; }
+.opt { padding: 10px 16px 12px; }
+
+/* Walking: one tappable row. */
+.opt--walk { padding: 0; }
+.walkrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 6px 16px;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.walkrow:hover, .walkrow[aria-pressed="true"] { background: var(--surface-2); }
+.walkrow__icon { width: 20px; height: 20px; color: var(--ink-3); }
+.walkrow__text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.walkrow__label { font-size: 15px; font-weight: 500; }
+.walkrow__sub { margin-left: 6px; font-size: 13px; color: var(--ink-3); }
+.walkrow__time { flex-shrink: 0; font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.walkrow__time strong { font-size: 16px; font-weight: 500; color: var(--ink); }
+.opt--best .walkrow__time strong { color: var(--walk); }
+.walkrow__map { width: 18px; height: 18px; color: var(--accent); }
+.opt--walk .opt__body { padding: 0 16px 12px; margin-left: 0; }
+.opt--walk .map-panel { margin-left: 0; }
 .opt + .opt, .opt + .notice { border-top: 1px solid var(--line); }
 
-.opt__head { display: flex; align-items: flex-start; gap: 12px; }
-.opt__head .icon--mode { margin-top: 2px; color: var(--ink-3); }
+.opt__head { display: flex; align-items: center; gap: 12px; }
+.opt__head .icon--mode { color: var(--ink-3); }
 
 .opt__titles { flex: 1; min-width: 0; }
 .opt__mode {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 500;
 }
-.opt--walk .opt__mode { font-weight: 500; }
-.opt__mode-sub { display: block; margin-top: 2px; font-size: 14px; color: var(--ink-3); }
 
 /* Route number as a coloured badge. */
 .badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 30px;
-  height: 24px;
-  padding: 0 7px;
-  font-size: 14px;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 5px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
   color: #fff;
   background: var(--route-colour, var(--ink-3));
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 .opt__time { text-align: right; flex-shrink: 0; }
 .opt__time-range {
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 500;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -521,17 +547,8 @@ button { -webkit-tap-highlight-color: transparent; }
 .opt__body { margin-left: 34px; }
 
 /* The single most important line on the screen: which stop to stand at. */
-.board { margin: 10px 0 0 34px; }
-.board__label {
-  margin: 0;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ink-3);
-}
-.board__name { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.25; }
-.board__zh { display: inline-block; margin-left: 6px; font-size: 15px; font-weight: 400; color: var(--ink-2); }
-.board__walk { margin: 1px 0 0; font-size: 14px; color: var(--ink-3); }
-.board__side { margin: 0; font-size: 13.5px; color: var(--ink-3); }
+.board { margin: 4px 0 0 34px; font-size: 13px; color: var(--ink-3); line-height: 1.3; }
+.board__name { font-size: 16px; font-weight: 600; color: var(--ink); }
 
 /* --- the wait ------------------------------------------------------------
  *
@@ -544,7 +561,7 @@ button { -webkit-tap-highlight-color: transparent; }
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   font-size: 15px;
   color: var(--ink);
 }
@@ -560,7 +577,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 /* --- leg breakdown ------------------------------------------------------ */
 
-.legs { list-style: none; margin: 6px 0 0; padding: 0; }
+.legs { list-style: none; margin: 4px 0 0; padding: 0; }
 .legs li {
   display: flex;
   align-items: baseline;
@@ -576,7 +593,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 /* --- departures --------------------------------------------------------- */
 
-.deps { margin: 6px 0 0; }
+.deps { margin: 4px 0 0; }
 .deps__label { display: block; font-size: 12.5px; font-weight: 500; color: var(--ink-3); }
 .deps__times {
   display: flex;
@@ -594,7 +611,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 /* --- where the bus carries on ------------------------------------------- */
 
-.onward { margin-top: 6px; }
+.onward { margin-top: 4px; }
 .onward__label { margin: 0; font-size: 12.5px; font-weight: 500; color: var(--ink-3); }
 .onward__list { list-style: none; margin: 0; padding: 0; }
 .onward__list li {
@@ -618,7 +635,7 @@ button { -webkit-tap-highlight-color: transparent; }
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   font-size: 14px;
   line-height: 1.4;
   color: var(--ink-3);
@@ -638,8 +655,8 @@ button { -webkit-tap-highlight-color: transparent; }
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 36px;
-  margin: 8px 0 0 -10px;
+  min-height: 34px;
+  margin: 2px 0 -4px -10px;
   padding: 4px 12px;
   font: inherit;
   font-size: 14px;

@@ -144,6 +144,15 @@
       : steep + 'downhill, ~' + Math.abs(d) + ' m drop';
   }
 
+  /** "1.5 km · ↓99 m" — the same facts as describeWalk, for one line. */
+  function shortWalk(walkResult) {
+    var m = walkResult.metres;
+    var dist = m >= 1000 ? (m / 1000).toFixed(1) + ' km' : m + ' m';
+    var d = walkResult.deltaElevation;
+    if (Math.abs(d) < CFG.display.notableElevationMetres) return dist + ' · level';
+    return dist + ' · ' + (d > 0 ? '↑' : '↓') + Math.abs(d) + ' m';
+  }
+
   function describeWalk(walkResult) {
     if (walkResult.metres < 30) return 'you are basically there already';
     return walkResult.metres + ' m · ' + describeElevation(walkResult);
@@ -416,36 +425,44 @@
   // Option cards
   // =========================================================================
 
+  /**
+   * Walking as a single row, always first: it is the baseline every bus is
+   * measured against, so it should be visible without taking up the screen.
+   * The climb stays in the one line — on this campus a flat time estimate
+   * without it would mislead.
+   */
   function renderWalkCard(o) {
     var card = el('div', 'opt opt--walk' + (o.isBest ? ' opt--best' : ''));
+    var selected = state.selectedKey === o.key;
 
-    var head = el('div', 'opt__head');
-    head.appendChild(icon('walk', 'icon--mode'));
+    var row = el('button', 'walkrow');
+    row.type = 'button';
+    row.setAttribute('aria-pressed', String(selected));
+    row.setAttribute('aria-label', 'Walk, ' + formatRange(o.totalLow, o.totalHigh) +
+      ' minutes, ' + describeWalk(o.walk) + '. ' + (selected ? 'Hide map' : 'Show on map'));
+    row.appendChild(icon('walk', 'walkrow__icon'));
 
-    var titles = el('div', 'opt__titles');
-    titles.appendChild(el('h2', 'opt__mode', 'Walk'));
-    titles.appendChild(el('span', 'opt__mode-sub', describeWalk(o.walk)));
-    head.appendChild(titles);
+    var text = el('span', 'walkrow__text');
+    text.appendChild(el('span', 'walkrow__label', 'Walk'));
+    text.appendChild(el('span', 'walkrow__sub', shortWalk(o.walk)));
+    row.appendChild(text);
 
-    var time = el('div', 'opt__time');
-    time.appendChild(el('strong', 'opt__time-range', formatRange(o.totalLow, o.totalHigh)));
-    time.appendChild(el('span', 'opt__time-unit', 'min'));
-    time.appendChild(el('span', 'opt__arrive', o.arrivalLabel));
-    head.appendChild(time);
-    card.appendChild(head);
+    var time = el('span', 'walkrow__time');
+    time.appendChild(el('strong', null, formatRange(o.totalLow, o.totalHigh)));
+    time.appendChild(document.createTextNode(' min'));
+    row.appendChild(time);
+    row.appendChild(icon('map', 'walkrow__map'));
+
+    row.addEventListener('click', function () {
+      state.selectedKey = selected ? null : o.key;
+      render();
+      if (state.selectedKey) showMapFor(o);
+    });
+    card.appendChild(row);
 
     var body = el('div', 'opt__body');
-
-    // The elevation note is not optional. A flat time estimate on this campus
-    // is misleading — the same route is a different journey in each direction.
-    if (o.walk.climb >= CFG.display.notableElevationMetres) {
-      body.appendChild(flag('hill', 'flag--climb',
-        'The climb is the part the clock does not show.'));
-    }
-
-    body.appendChild(mapButton(o));
     attachMapPanel(o, body);
-    card.appendChild(body);
+    if (body.firstChild) card.appendChild(body);
     return card;
   }
 
@@ -487,10 +504,6 @@
                         : o.route.name);
     routes.forEach(function (r) { modeLine.appendChild(routeBadge(r)); });
     titles.appendChild(modeLine);
-    titles.appendChild(el('span', 'opt__mode-sub',
-      routes.length > 1
-        ? 'whichever comes first'
-        : (o.route.label || o.route.nameZh || '')));
     head.appendChild(titles);
 
     // The headline is time spent MOVING. The wait gets its own line below,
@@ -504,24 +517,11 @@
 
     // --- the single most important field on the screen ---
     // The most common failure for a new student is waiting at the wrong stop.
-    var board = el('div', 'board');
-    board.appendChild(el('p', 'board__label', 'Board at'));
-    var name = el('p', 'board__name', o.boardStop.name);
-    if (o.boardStop.nameZh) name.appendChild(el('span', 'board__zh', o.boardStop.nameZh));
-    board.appendChild(name);
-    board.appendChild(el('p', 'board__walk',
-      o.walkToStop.metres < 30
-        ? "You're already here."
-        : formatLeg(o.walkToStop.minutes) + ' walk · ' + describeWalk(o.walkToStop)));
-
-    // "(Downward)" is the Transport Office's wording and means nothing to
-    // somebody new. Say which kerb it is.
-    if (o.boardStop.side) {
-      board.appendChild(el('p', 'board__side',
-        o.boardStop.side === 'up'
-          ? 'The uphill side of the road — buses heading up the hill.'
-          : 'The downhill side of the road — buses heading down the hill.'));
-    }
+    // Name only: the walk to it is in the legs below, and the stop name
+    // already says (Upward) or (Downward).
+    var board = el('p', 'board');
+    board.appendChild(el('span', 'board__label', 'Board at '));
+    board.appendChild(el('span', 'board__name', o.boardStop.name));
     card.appendChild(board);
 
     // --- boarding on the wrong side sends you round the whole campus ---
@@ -572,19 +572,19 @@
 
     if (o.walkToStop.metres >= 30) {
       legs.appendChild(legRow('walk', 'Walk',
-        'to ' + o.boardStop.name, formatLeg(o.walkToStop.minutes)));
+        'to the stop · ' + shortWalk(o.walkToStop), formatLeg(o.walkToStop.minutes)));
     }
 
     legs.appendChild(legRow('bus', 'Ride',
-      'to ' + o.alightStop.name +
-      (o.rideIsEstimated ? ' · time estimated' : ''),
+      // The "~" on the time marks it as an estimate; the footer says why.
+      'to ' + o.alightStop.name,
       o.rideMinutesHigh && o.rideMinutesHigh - o.rideMinutesLow >= 1
         ? '~' + Math.round(o.rideMinutesLow) + '–' + Math.round(o.rideMinutesHigh) + ' min'
         : '~' + Math.round(o.rideMinutes) + ' min'));
 
     if (o.walkFromStop.metres >= 30) {
       legs.appendChild(legRow('walk', 'Walk',
-        describeWalk(o.walkFromStop), formatLeg(o.walkFromStop.minutes)));
+        shortWalk(o.walkFromStop), formatLeg(o.walkFromStop.minutes)));
     }
     body.appendChild(legs);
 
@@ -727,7 +727,10 @@
 
 
     result.options.forEach(function (o) {
-      out.appendChild(o.kind === 'walk' ? renderWalkCard(o) : renderShuttleCard(o));
+      if (o.kind === 'walk') out.appendChild(renderWalkCard(o));
+    });
+    result.options.forEach(function (o) {
+      if (o.kind !== 'walk') out.appendChild(renderShuttleCard(o));
     });
 
     if (result.noShuttleReason) {

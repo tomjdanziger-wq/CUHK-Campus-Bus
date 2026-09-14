@@ -913,6 +913,27 @@
         }
       });
 
+      // --- stops passed on the way, as small white dots ---
+      // So you can see where else the bus stops before yours, and get off
+      // earlier if one of them suits you better. Tap one for the walk from it.
+      if (option.kind === 'shuttle') safely('stops on the way', function () {
+        var byId = {};
+        DATA.stops.forEach(function (st) { byId[st.id] = st; });
+        for (var si = option.boardIndex + 1; si < option.alightIndex; si++) {
+          var stop = byId[option.route.stops[si]];
+          if (!stop) continue;
+          var tip = '<strong>' + stop.name + '</strong><br>the bus stops here on the way';
+          if (state.destination) {
+            var w = geo.walk(stop, state.destination, CFG);
+            tip += '<br>get off here: about ' + Math.max(1, Math.round(w.minutes)) + ' min walk';
+          }
+          L.circleMarker([stop.lat, stop.lng], {
+            radius: 4, color: option.route.colour, weight: 2,
+            fillColor: '#ffffff', fillOpacity: 1, opacity: 1
+          }).addTo(state.activeLayer).bindPopup(tip);
+        }
+      });
+
       // --- walking legs, dashed, on real paths ---
       var walkColour = CFG.walkColour || '#1b7f4d';
       function drawWalk(from, to) {
@@ -1073,6 +1094,14 @@
     }
     if (option.kind === 'shuttle' && option.onwardStops && option.onwardStops.length) {
       row(option.route.colour, 'Where it carries on', 'dashed');
+    }
+    if (option.kind === 'shuttle' && option.alightIndex - option.boardIndex > 1) {
+      var stopsItem = el('span', 'legend__item');
+      var dot = el('span', 'legend__stopdot');
+      dot.style.borderColor = option.route.colour;
+      stopsItem.appendChild(dot);
+      stopsItem.appendChild(el('span', null, 'Stops on the way'));
+      box.appendChild(stopsItem);
     }
     row(CFG.walkColour || '#1b7f4d', 'Your walk', 'dotted');
     var faint = el('span', 'legend__item legend__item--muted');

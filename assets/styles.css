@@ -834,6 +834,14 @@ li + li > .results__map { border-top: 1px solid var(--line); }
 .legend__item--muted { color: var(--ink-3); }
 .legend__swatch { width: 20px; height: 4px; flex-shrink: 0; border-radius: 2px; }
 .legend__swatch--dashed { width: 26px; height: 0; border-top: 5px dashed currentColor; border-radius: 0; }
+.legend__stopdot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  background: #fff;
+  border: 2px solid;
+  border-radius: 50%;
+}
 .legend__swatch--dotted { height: 0; border-top: 4px dotted currentColor; border-radius: 0; }
 
 /* --- map overlays -------------------------------------------------------- */

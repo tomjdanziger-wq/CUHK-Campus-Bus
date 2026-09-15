@@ -1,11 +1,10 @@
 /* ---------------------------------------------------------------------------
- * stats.js — the private stats page.
+ * stats.js — the stats page.
  *
- * Nothing loads until someone signs in with Google, and the database only
- * answers for account ids listed in data/firebase-config.js
- * (FIREBASE_ADMIN_UIDS) — the rules enforce it, this page only asks. Anyone
- * else sees "private" and their own account id, which is how the owner finds
- * theirs the first time.
+ * Kept out of sight rather than locked: it lives at an unguessable address,
+ * is not linked from the app, and asks search engines not to index it. The
+ * reports themselves are readable by anyone who goes looking, as the app's
+ * own Track page needs them to be — nothing here is secret.
  * ------------------------------------------------------------------------- */
 
 (function () {
@@ -57,76 +56,18 @@
     };
   }
 
-  // ---- sign-in ----------------------------------------------------------------
+  // ---- start ----------------------------------------------------------------------
 
   function init() {
     if (!window.FIREBASE_CONFIG) {
-      $('gate-text').textContent = 'Tracking is not set up for this copy of the app.';
-      $('sign-in').hidden = true;
+      $('stats-status').textContent = 'Tracking is not set up for this copy of the app.';
       return;
     }
     if (!fb.apps.length) fb.initializeApp(window.FIREBASE_CONFIG);
-
-    $('sign-in').addEventListener('click', function () {
-      var provider = new fb.auth.GoogleAuthProvider();
-      fb.auth().signInWithPopup(provider).catch(function (err) {
-        $('gate-text').textContent = explainSignInError(err);
-      });
+    wireFilters();
+    loadAll().then(render, function (err) {
+      $('stats-status').textContent = 'Could not load the data: ' + ((err && err.message) || err);
     });
-    [$('sign-out'), $('sign-out-2')].forEach(function (b) {
-      b.addEventListener('click', function () { fb.auth().signOut(); });
-    });
-    $('uid-copy').addEventListener('click', function () {
-      try { navigator.clipboard.writeText($('uid-value').textContent); $('uid-copy').textContent = 'Copied'; }
-      catch (e) { /* select it by hand */ }
-    });
-
-    fb.auth().onAuthStateChanged(function (user) {
-      if (!user || user.isAnonymous) return showGate(null);
-      $('gate-title').textContent = 'Checking access…';
-      $('gate-text').textContent = 'Signed in as ' + (user.email || 'your Google account') + '.';
-      $('sign-in').hidden = true;
-      loadAll().then(function () {
-        $('gate').hidden = true;
-        $('admin').hidden = false;
-        wireFilters();
-        render();
-      }, function (err) {
-        if (err && err.code === 'permission-denied') return showGate(user);
-        $('gate-title').textContent = 'Could not load the data';
-        $('gate-text').textContent = (err && err.message) || String(err);
-      });
-    });
-  }
-
-  function explainSignInError(err) {
-    var code = err && err.code;
-    if (code === 'auth/operation-not-allowed') {
-      return 'Google sign-in is not switched on yet: Firebase console → Authentication → Sign-in method → Google.';
-    }
-    if (code === 'auth/unauthorized-domain') {
-      return 'This website is not on the allowed list yet: Firebase console → Authentication → Settings → Authorized domains → add ' + location.hostname + '.';
-    }
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return 'Sign-in was cancelled.';
-    if (code === 'auth/popup-blocked') return 'The sign-in window was blocked. Allow pop-ups for this site and try again.';
-    return 'Sign-in failed: ' + ((err && err.message) || code);
-  }
-
-  function showGate(user) {
-    $('admin').hidden = true;
-    $('gate').hidden = false;
-    $('sign-in').hidden = !!user;
-    $('sign-out').hidden = !user;
-    $('gate-uid').hidden = !user;
-    if (user) {
-      $('gate-title').textContent = 'No access with this account';
-      $('gate-text').textContent = 'Signed in as ' + (user.email || 'a Google account') +
-        ', but this account is not allowed to read the stats.';
-      $('uid-value').textContent = user.uid;
-    } else {
-      $('gate-title').textContent = 'This page is private';
-      $('gate-text').textContent = 'Sign in with the Google account that runs the app.';
-    }
   }
 
   // ---- data ---------------------------------------------------------------------
@@ -135,7 +76,8 @@
     var db = fb.firestore();
     var out = [];
     function page(after) {
-      var q = db.collection(name).orderBy('t').limit(500);
+      // 200 per page: the most the database rules allow per query.
+      var q = db.collection(name).orderBy('t').limit(200);
       if (after) q = q.startAfter(after);
       return q.get().then(function (snap) {
         snap.docs.forEach(function (d) {
@@ -147,7 +89,7 @@
             auto: v.auto === true, how: v.how || ''
           });
         });
-        return snap.docs.length === 500 ? page(snap.docs[snap.docs.length - 1]) : out;
+        return snap.docs.length === 200 ? page(snap.docs[snap.docs.length - 1]) : out;
       });
     }
     return page(null);
@@ -574,7 +516,7 @@
   var resizeTimer = null;
   window.addEventListener('resize', function () {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(function () { if (!$('admin').hidden) render(); }, 150);
+    resizeTimer = setTimeout(function () { if (!$('stats-body').hidden) render(); }, 150);
   });
 
   init();

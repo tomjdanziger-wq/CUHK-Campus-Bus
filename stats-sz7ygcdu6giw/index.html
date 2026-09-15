@@ -7,15 +7,15 @@
   <meta name="theme-color" content="#202124" media="(prefers-color-scheme: dark)">
   <meta name="robots" content="noindex">
   <title>Shuttle data · CUHK Shuttle Helper</title>
-  <link rel="stylesheet" href="assets/styles.css">
-  <link rel="stylesheet" href="assets/stats.css">
+  <link rel="stylesheet" href="../assets/styles.css">
+  <link rel="stylesheet" href="../assets/stats.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
 </head>
 <body class="stats-page">
 
 <main class="stats">
   <header class="stats__head">
-    <a class="stats__back" href="./">← Back to the app</a>
+    <a class="stats__back" href="../">← Back to the app</a>
     <h1 class="stats__title">What riders have logged</h1>
     <p class="stats__lede">
       Every bus reported, spotted from a stop, or logged stop by stop.
@@ -23,20 +23,7 @@
     </p>
   </header>
 
-  <!-- Private: nothing below loads until an admin account signs in. -->
-  <section id="gate" class="card gate">
-    <h2 class="card__title" id="gate-title">This page is private</h2>
-    <p class="card__sub" id="gate-text">Sign in with the Google account that runs the app.</p>
-    <button id="sign-in" class="report__send gate__btn" type="button">Sign in with Google</button>
-    <div id="gate-uid" class="gate__uid" hidden>
-      <p class="card__sub">Your account id — send it to whoever sets up the app to get access:</p>
-      <code id="uid-value"></code>
-      <button id="uid-copy" class="report__more" type="button">Copy</button>
-    </div>
-    <button id="sign-out" class="report__more" type="button" hidden>Sign out</button>
-  </section>
-
-  <div id="admin" hidden>
+  <div id="admin">
   <!-- Filters scope everything below them. -->
   <div class="stats__filters" role="group" aria-label="Time range">
     <button class="chip" type="button" data-range="1" aria-pressed="false">Today</button>
@@ -102,7 +89,6 @@
       <h2 id="h-recent" class="card__title">Latest</h2>
       <div class="tablewrap"><table class="table" id="table-recent"></table></div>
       <button id="download" class="report__more" type="button">Download all as CSV</button>
-      <button id="sign-out-2" class="report__more" type="button">Sign out</button>
     </section>
   </div>
 
@@ -111,14 +97,13 @@
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
 </main>
 
-<script src="data/places.generated.js"></script>
-<script src="data/routes.generated.js"></script>
-<script src="data/shuttle-data.js"></script>
-<script src="data/firebase-config.js"></script>
-<script src="lib/geo.js"></script>
-<script src="lib/planner.js"></script>
+<script src="../data/places.generated.js"></script>
+<script src="../data/routes.generated.js"></script>
+<script src="../data/shuttle-data.js"></script>
+<script src="../data/firebase-config.js"></script>
+<script src="../lib/geo.js"></script>
+<script src="../lib/planner.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.1/firebase-app-compat.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.1/firebase-auth-compat.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.1/firebase-firestore-compat.min.js"></script>
 <script src="stats.js"></script>
 

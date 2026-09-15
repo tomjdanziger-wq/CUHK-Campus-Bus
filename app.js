@@ -3062,13 +3062,7 @@
     return firebaseReady().then(function (db) {
       return Promise.all(entries.map(function (e) {
         return db.collection('spots').doc(e.key).get({ source: 'server' })
-          .then(function (d) { return d.exists ? e : null; }, function (err) {
-            // The app may only read the last few hours. A report older than
-            // that which cannot be read back was almost certainly stored by
-            // the interrupted send; a fresh one refused here is the cooldown.
-            var old = Date.now() - e.at > 2.5 * 3600000;
-            return err && err.code === 'permission-denied' && old ? e : null;
-          });
+          .then(function (d) { return d.exists ? e : null; });
       }));
     }).then(function (found) { return found.filter(Boolean); });
   }

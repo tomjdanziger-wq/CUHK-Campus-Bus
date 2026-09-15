@@ -657,7 +657,7 @@ Location never leaves the phone: it only decides *when* to send an ordinary repo
 
 Each report is an ordinary report with the same ride id, so everyone else sees where that bus is now ("rider on board, logging stops") rather than a trail of every stop it passed. It records when the bus reached the stop by the phone's clock (`at`), so waiting for signal or for the gap between reports does not distort the timing, and whether GPS or a tap logged it (`auto`).
 
-The private stats page (below) turns these logs into ride times: it pairs consecutive taps one stop apart within each ride, takes the median per hop (arrival to arrival, so the dwell at the previous stop is included), and once every hop of a route has three or more samples shows a `rideTimes` line to paste into `data/shuttle-data.js`. A skipped stop leaves a gap, so it never produces a false two-stop "hop".
+The stats page (below) turns these logs into ride times: it pairs consecutive taps one stop apart within each ride, takes the median per hop (arrival to arrival, so the dwell at the previous stop is included), and once every hop of a route has three or more samples shows a `rideTimes` line to paste into `data/shuttle-data.js`. A skipped stop leaves a gap, so it never produces a false two-stop "hop".
 
 ### Setting up Firebase
 
@@ -689,20 +689,13 @@ Reports are **not** deleted: they are the raw material for modelling how long ea
 
 Size is not a concern: a report is well under 1 KB, so Firestore's free 1 GB holds hundreds of thousands.
 
-### The private stats page
+### The stats page
 
-`stats.html` shows what has been logged: totals, how early or late buses are against the timetable (overall and per route), sightings by hour, busiest stops, measured stop-to-stop times with ready-to-paste `rideTimes`, where people get off, the latest reports, and a CSV download of everything. It is not linked from the app and is marked `noindex`, but that is not what keeps it private.
+Totals, how early or late buses are against the timetable (overall and per route), sightings by hour, busiest stops, measured stop-to-stop times with ready-to-paste `rideTimes`, where people get off, the latest reports, and a CSV download of everything.
 
-**The rules are.** Anyone — the app included — may read only the last 3 hours of reports, which is all the Track page and trip cards need. The full history can only be read by the Firebase account ids in `FIREBASE_ADMIN_UIDS` (`data/firebase-config.js`); the page signs in with Google and asks. Ids, not emails, so no address sits in the public code.
+It lives at an address that is hard to guess — `/stats-sz7ygcdu6giw/` — is not linked from the app, and asks search engines not to index it. That hides it; it does not protect it. There is no sign-in, and the reports themselves are readable by anyone who goes looking (the app's Track page needs them to be). Anyone who can see this repository can also see the folder name. To move it, rename the folder.
 
 Punctuality compares each sighting with the nearest timetabled bus at that stop (within 20 minutes). At the first stop that is the published time; at later stops it adds the estimated ride time, so part of any difference there is the estimate — the page says so, and the comparison gets sharper as measured `rideTimes` replace estimates.
-
-Setting up access, once:
-
-1. Firebase console → **Authentication → Sign-in method → Google** → enable.
-2. **Authentication → Settings → Authorized domains** → add `cuhk-campus-bus.vercel.app` (localhost is there already).
-3. Open `stats.html`, sign in. It shows *No access with this account* and your account id.
-4. Put that id in `FIREBASE_ADMIN_UIDS`, run `node scripts/build-firestore-rules.js`, and publish `firestore.rules`.
 
 ## Deliberately not built (v1)
 

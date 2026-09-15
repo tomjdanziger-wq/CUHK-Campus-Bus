@@ -131,16 +131,4 @@
 .table .badge { margin-right: 6px; }
 .table .muted { color: var(--ink-3); }
 
-.gate { margin-top: 18px; }
-.gate__btn { max-width: 320px; }
-.gate__uid { margin-top: 14px; }
-.gate__uid code {
-  display: block;
-  padding: 8px 10px;
-  font-size: 14px;
-  word-break: break-all;
-  background: var(--surface-2);
-  border-radius: 8px;
-}
-#admin[hidden], #gate[hidden] { display: none; }
 .paste { display: block; margin-top: 4px; padding: 6px 8px; font-size: 12.5px; background: var(--surface-2); border-radius: 6px; word-break: break-all; }

@@ -49,7 +49,9 @@ It is a static site. Push the repo and point Vercel at it — no configuration, 
 
 Rider tracking stores its reports in Firebase (Cloud Firestore), straight from the browser; see [Rider tracking](#rider-tracking) for the one-time setup.
 
-The only external request the app ever makes is loading Leaflet and OSM tiles for the optional map, and it is lazy: the app is fully functional with no network at all.
+Beyond that, the app loads Leaflet and OSM tiles for the optional map (lazily — it is fully functional with no network at all) and Firebase only once tracking is used.
+
+**Analytics:** Vercel Web Analytics, via the plain-HTML snippet at the bottom of `index.html` (the npm `@vercel/analytics` package is for React/Next and would need a build step). It counts page views without cookies. Switch it on under the project's **Analytics** tab in Vercel; until then, and on any other host, the script simply is not there.
 
 ---
 

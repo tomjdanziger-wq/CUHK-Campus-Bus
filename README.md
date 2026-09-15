@@ -482,9 +482,9 @@ The home is `config.lastBus.home` in `data/shuttle-data.js`. The logic is
 
 ## Browsing the network
 
-The app is three pages side by side — **Routes**, **Go**, **Food** — with the
-trip planner in the middle. Swipe right for the route map, left for food, or
-use the bottom navigation bar. The look follows Google Maps on purpose: a
+The app is four pages side by side — **Spot**, **Track**, **Routes**, **Go** —
+opening on the trip planner at the right-hand end. Swipe right for the route map
+and the tracking pages, or use the bottom navigation bar. The look follows Google Maps on purpose: a
 search card with start and destination joined by a dotted line, shortcut chips
 (I House 6, MTR) on the left beneath it, the departure time as a small chip on
 the right, and route numbers as coloured badges. It is one horizontal scroller with CSS scroll snapping,
@@ -536,9 +536,12 @@ own name also contains the word ranks above one that merely carries the
 category, so `canteen` reaches Shaw College Student Canteen before it reaches a
 noodle bar that happens to be tagged as one.
 
-The **Food** page is a second way in: the same list sorted by how far each one
-is from wherever you have said you are, filterable by kind. It is a finder, not
-a food guide — it deliberately shows only name, kind and distance.
+There used to be a separate **Food** page listing them by distance; it added
+little over typing `canteen`, and was removed.
+
+Shops OpenStreetMap does not have are added by hand in `extraPlaces`: the
+**Fusion Supermarket** (lower ground floor of John Fulton Centre) is found by
+`fusion`, `supermarket`, `grocery`, `ParknShop` or `百佳`.
 
 Opening hours are stored where OpenStreetMap has them (11 of 36) but are not
 displayed. The Finance Office publishes authoritative hours for the ten
@@ -551,7 +554,9 @@ bigger job than the data is currently worth.
 
 Fuzzy matching runs over English names, Chinese names and hand-written aliases,
 with exact matches, prefixes, word-starts, initialisms and typos all scored
-differently.
+differently. A query whose words are split between a place's name and its
+aliases still matches, below a match within one field: `fusion grocery` finds
+Fusion Supermarket, `canteen new asia` the New Asia canteens.
 
 Three things live in `data/shuttle-data.js`:
 

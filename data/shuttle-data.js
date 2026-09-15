@@ -530,6 +530,14 @@
   //     aliases: ['gate'], lat: 22.0000, lng: 114.0000, elevation: 0 }
   // -------------------------------------------------------------------------
   var extraPlaces = [
+    // Not in OpenStreetMap. Lower ground floor of John Fulton Centre, per the
+    // Office of Student Affairs list of campus shops (osa.cuhk.edu.hk);
+    // coordinates and elevation are the building's.
+    { id: 'fusion-supermarket', name: 'Fusion Supermarket', nameZh: null,
+      aliases: ['fusion', 'fusion by PARKnSHOP', 'PARKnSHOP', 'ParknShop', 'supermarket',
+                'grocery', 'grocery store', 'groceries', 'John Fulton Centre supermarket',
+                '百佳', '超級市場', '超市'],
+      lat: 22.418218, lng: 114.204684, elevation: 88 }
   ];
 
   // -------------------------------------------------------------------------
@@ -556,8 +564,8 @@
     ice_cream:   ['ice cream', 'dessert', 'food', '雪糕'],
     bar:         ['bar', 'drinks', 'pub'],
     pub:         ['pub', 'bar', 'drinks'],
-    convenience: ['convenience store', 'shop', 'snacks', '便利店'],
-    supermarket: ['supermarket', 'groceries', 'shop', '超級市場', '超市'],
+    convenience: ['convenience store', 'grocery', 'shop', 'snacks', '便利店'],
+    supermarket: ['supermarket', 'grocery', 'groceries', 'shop', '超級市場', '超市'],
     deli:        ['deli', 'food', 'shop'],
     coffee:      ['coffee', 'cafe', '咖啡']
   };

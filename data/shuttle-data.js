@@ -207,13 +207,12 @@
 
     // Rider reports: "I just got on Route 4 at Wu Yee Sun". Crowd-sourced,
     // never official, and they go stale fast — so they are shown briefly and
-    // always with their age. Read by the app AND by api/sightings.js.
+    // always with their age. cooldownSeconds and keepMinutes are also written
+    // into firestore.rules by scripts/build-firestore-rules.js.
     tracking: {
       showMinutes: 90,        // how far back the Track page lists reports
       keepMinutes: 180,       // how long the server keeps them at all
       cooldownSeconds: 45,    // one report per phone per this long
-      maxPerAddressPer10Min: 40, // loose cap per network address (campus
-                              // Wi-Fi puts many phones behind one address)
       cardMaxAgeMinutes: 20,  // a report older than this is not shown on a trip
       confirmWindowMinutes: 5 // reports of the same bus at the same stop this
                               // close together count as one, seen by several

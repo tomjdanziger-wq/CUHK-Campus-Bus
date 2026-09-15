@@ -1731,29 +1731,31 @@
   // =========================================================================
   // Track: rider reports
   //
-  // Someone who has just boarded says where and which bus, in two taps. The
-  // server (api/sightings.js) keeps reports for a few hours with no account
-  // and nothing about the reporter. Everything shown is labelled as a rider
-  // report with its age — never "live", never official.
+  // Someone who has just boarded says where and which bus, in two taps.
+  // Reports go to Cloud Firestore. The phone signs in to Firebase
+  // anonymously — invisibly, no screen, no name, no email — which is only
+  // there so the security rules can tell one phone from another for the
+  // cooldown. Everything shown is labelled as a rider report with its age:
+  // never "live", never official.
   //
-  // Without the server (a local static preview, or before storage is set up
-  // on Vercel) the page says tracking is off and everything else carries on.
+  // If Firebase cannot load (no signal, config removed) the page says
+  // tracking is off and everything else carries on.
   // =========================================================================
 
-  var SIGHTINGS_URL = 'api/sightings';
+  var FIREBASE_SDK = 'https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.1/';
   var TRACK = CFG.tracking || { showMinutes: 90, cooldownSeconds: 45,
                                 cardMaxAgeMinutes: 20, confirmWindowMinutes: 5 };
 
   var track = {
-    status: 'unknown',     // 'ok' | 'off' | 'error'
-    serverNow: 0,
-    fetchedAt: 0,
+    status: 'unknown',     // 'connecting' | 'ok' | 'off' | 'error'
     list: [],
     stop: null,            // selected stop id
     route: null,           // selected route id
     showAllStops: false,
     cooldownUntil: 0,
-    timer: null
+    ready: null,           // Promise of Firestore
+    unsubscribe: null,
+    subscribedAt: 0
   };
 
   function stopById(id) {
@@ -1765,50 +1767,108 @@
     return null;
   }
 
-  /** A random id this phone makes up for itself, so a shared campus Wi-Fi
-   *  address does not throttle everyone at once. Not an account. */
-  function deviceId() {
-    try {
-      var id = localStorage.getItem('deviceId');
-      if (!id) {
-        id = Math.random().toString(36).slice(2) + Date.now().toString(36);
-        localStorage.setItem('deviceId', id);
-      }
-      return id;
-    } catch (e) {
-      return 'anon';
-    }
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var js = document.createElement('script');
+      js.src = src;
+      js.onload = resolve;
+      js.onerror = function () { js.remove(); reject(new Error('failed: ' + src)); };
+      document.head.appendChild(js);
+    });
+  }
+
+  /**
+   * Firebase, loaded only when tracking is first needed, and signed in
+   * anonymously. Resolves to the Firestore handle. A failure is forgotten, so
+   * the next attempt tries again.
+   */
+  function firebaseReady() {
+    if (!window.FIREBASE_CONFIG) return Promise.reject(new Error('off'));
+    if (track.ready) return track.ready;
+
+    track.ready = loadScript(FIREBASE_SDK + 'firebase-app-compat.min.js')
+      .then(function () {
+        return Promise.all([
+          loadScript(FIREBASE_SDK + 'firebase-auth-compat.min.js'),
+          loadScript(FIREBASE_SDK + 'firebase-firestore-compat.min.js')
+        ]);
+      })
+      .then(function () {
+        var fb = window.firebase;
+        if (!fb.apps.length) fb.initializeApp(window.FIREBASE_CONFIG);
+        return fb.auth().currentUser ? fb.auth().currentUser : fb.auth().signInAnonymously();
+      })
+      .then(function () { return window.firebase.firestore(); })
+      .catch(function (err) {
+        track.ready = null;
+        throw err;
+      });
+    return track.ready;
+  }
+
+  function toMillis(t) {
+    if (!t) return Date.now();                  // pending server timestamp
+    return typeof t.toMillis === 'function' ? t.toMillis() : +t;
+  }
+
+  /**
+   * Keep a live listener on the last `showMinutes` of reports. Only changes
+   * are sent and billed, so this is cheaper than polling as well as quicker.
+   * The window is fixed when the listener starts, so it is renewed regularly.
+   */
+  function fetchSightings() {
+    return firebaseReady().then(function (db) {
+      if (track.unsubscribe && Date.now() - track.subscribedAt < 10 * 60000) return;
+      if (track.unsubscribe) track.unsubscribe();
+
+      var since = window.firebase.firestore.Timestamp.fromMillis(Date.now() - TRACK.showMinutes * 60000);
+      track.subscribedAt = Date.now();
+      track.unsubscribe = db.collection('sightings')
+        .where('t', '>=', since)
+        .orderBy('t', 'desc')
+        .limit(200)
+        .onSnapshot({ includeMetadataChanges: true }, function (snap) {
+          // Firestore answers from its local cache first and quietly waits
+          // for the server. An empty cache is not "no reports", so say
+          // "connecting" until the server has actually replied.
+          if (snap.metadata.fromCache && track.status !== 'ok') {
+            track.status = 'connecting';
+            sightingsChanged();
+            return;
+          }
+          track.status = 'ok';
+          track.list = snap.docs.map(function (d) {
+            var v = d.data({ serverTimestamps: 'estimate' });
+            return { id: d.id, stop: v.stop, route: v.route, t: toMillis(v.t) };
+          }).filter(function (sg) {
+            return Date.now() - sg.t <= TRACK.showMinutes * 60000;
+          });
+          sightingsChanged();
+        }, function (err) {
+          if (window.console) console.warn('Sightings listener:', err);
+          track.status = 'error';
+          track.unsubscribe = null;
+          sightingsChanged();
+        });
+    }).catch(function (err) {
+      track.status = err && err.message === 'off' ? 'off' : 'error';
+      sightingsChanged();
+    });
+  }
+
+  function sightingsChanged() {
+    if (currentPage === PAGE_TRACK) { renderSightings(); renderReport(); }
+    if (state.origin && state.destination) render();
   }
 
   function minutesAgo(t) {
-    var now = track.serverNow + (Date.now() - track.fetchedAt);
-    return Math.max(0, (now - t) / 60000);
+    return Math.max(0, (Date.now() - t) / 60000);
   }
 
   function agoText(min) {
     if (min < 1) return 'just now';
     if (min < 60) return Math.round(min) + ' min ago';
     return Math.floor(min / 60) + ' h ' + Math.round(min % 60) + ' min ago';
-  }
-
-  function fetchSightings() {
-    return fetch(SIGHTINGS_URL, { cache: 'no-store' }).then(function (r) {
-      // 404: no server at all (static preview). 503: server, no storage yet.
-      if (r.status === 404 || r.status === 503) { track.status = 'off'; return null; }
-      if (!r.ok) throw new Error('status ' + r.status);
-      return r.json();
-    }).then(function (data) {
-      if (!data) return;
-      track.status = 'ok';
-      track.serverNow = data.now;
-      track.fetchedAt = Date.now();
-      track.list = data.sightings || [];
-    }).catch(function () {
-      if (track.status !== 'ok') track.status = 'error';
-    }).then(function () {
-      if (currentPage === PAGE_TRACK) renderSightings();
-      if (state.origin && state.destination) render();
-    });
   }
 
   /**
@@ -1934,38 +1994,62 @@
     $('report-send').disabled = true;
     status.textContent = 'Sending…';
 
-    fetch(SIGHTINGS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Device': deviceId() },
-      body: JSON.stringify({ stop: stop, route: route })
-    }).then(function (r) {
-      return r.json().catch(function () { return {}; }).then(function (body) {
-        return { status: r.status, body: body };
+    firebaseReady().then(function (db) {
+      var fb = window.firebase;
+      var uid = fb.auth().currentUser.uid;
+      var now = fb.firestore.FieldValue.serverTimestamp();
+
+      // One batch, two writes: the report, and this phone's cooldown marker.
+      // The rules only accept the report if the marker moves in the same
+      // batch, and only let the marker move once the cooldown has passed.
+      var batch = db.batch();
+      batch.set(db.collection('sightings').doc(), {
+        stop: stop,
+        route: route,
+        t: now,
+        // Firestore's TTL policy deletes the document after this time.
+        expireAt: fb.firestore.Timestamp.fromMillis(Date.now() + TRACK.keepMinutes * 60000)
       });
-    }).then(function (res) {
-      if (res.status === 201) {
-        status.textContent = 'Shared. Thank you — that helps everyone waiting.';
+      batch.set(db.collection('throttle').doc(uid), { t: now });
+
+      // Firestore never fails a write for lack of signal; it queues it and
+      // keeps trying. Don't leave the button on "Sending…" forever.
+      return Promise.race([
+        batch.commit(),
+        new Promise(function (resolve, reject) {
+          setTimeout(function () { reject({ code: 'slow' }); }, 12000);
+        })
+      ]);
+    }).then(function () {
+      status.textContent = 'Shared. Thank you — that helps everyone waiting.';
+      track.cooldownUntil = Date.now() + TRACK.cooldownSeconds * 1000;
+      track.stop = null;
+      track.route = null;
+      tickCooldown();
+      fetchSightings();
+    }).catch(function (err) {
+      var code = err && err.code;
+      if (err && err.message === 'off') {
+        track.status = 'off';
+        status.textContent = 'Tracking is not switched on yet.';
+      } else if (code === 'permission-denied') {
+        // Almost always the cooldown. (Or a stop/route pair the rules do not
+        // know, which the app never offers.)
+        status.textContent = 'You just reported. Try again in a moment.';
+        track.cooldownUntil = Date.now() + TRACK.cooldownSeconds * 1000;
+        tickCooldown();
+      } else if (code === 'slow') {
+        status.textContent = 'Slow connection — your report will go through as soon as it can.';
         track.cooldownUntil = Date.now() + TRACK.cooldownSeconds * 1000;
         track.stop = null;
         track.route = null;
         tickCooldown();
-        return fetchSightings();
-      }
-      if (res.status === 429) {
-        status.textContent = res.body.error === 'too-many'
-          ? 'Lots of reports from this network just now. Try again in a few minutes.'
-          : 'You just reported. Try again in a moment.';
-        track.cooldownUntil = Date.now() + (res.body.retryAfter || TRACK.cooldownSeconds) * 1000;
-        tickCooldown();
-      } else if (res.status === 404 || res.status === 503) {
-        track.status = 'off';
-        status.textContent = 'Tracking is not switched on yet.';
+      } else if (code === 'unavailable' || !navigator.onLine) {
+        status.textContent = 'No connection. Try again when you have signal.';
       } else {
         status.textContent = 'That did not go through. Try again.';
+        if (window.console) console.warn('Report failed:', err);
       }
-      renderReport();
-    }).catch(function () {
-      status.textContent = 'No connection. Try again when you have signal.';
       renderReport();
     });
   }
@@ -1988,8 +2072,8 @@
       note.textContent = 'Could not load reports. Check your connection.';
       return;
     }
-    if (track.status === 'unknown') {
-      note.textContent = 'Loading…';
+    if (track.status === 'unknown' || track.status === 'connecting') {
+      note.textContent = 'Connecting…';
       return;
     }
 
@@ -1997,6 +2081,7 @@
     // minutes are one sighting, confirmed — not several buses.
     var groups = [];
     track.list.forEach(function (sg) {
+      if (!routeById(sg.route) || !stopById(sg.stop)) return;
       var g = groups.filter(function (x) {
         return x.route === sg.route && x.stop === sg.stop &&
                Math.abs(x.t - sg.t) <= TRACK.confirmWindowMinutes * 60000;
@@ -2048,16 +2133,23 @@
     $('report-send').addEventListener('click', sendReport);
 
     fetchSightings();
-    // Reports age by the minute. Refresh often while looking at them, rarely
-    // otherwise, never while the app is hidden.
+    // New reports arrive through the listener. This only re-draws the ages
+    // ("3 min ago") and renews the listener's time window now and then.
     setInterval(function () {
       if (document.hidden) return;
-      if (currentPage === PAGE_TRACK) fetchSightings();
-    }, 20000);
-    setInterval(function () {
-      if (document.hidden || currentPage === PAGE_TRACK) return;
       fetchSightings();
-    }, 60000);
+      if (currentPage === PAGE_TRACK) renderSightings();
+    }, 30000);
+
+    // No listening while the app is in the background.
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && track.unsubscribe) {
+        track.unsubscribe();
+        track.unsubscribe = null;
+      } else if (!document.hidden) {
+        fetchSightings();
+      }
+    });
   }
 
   // =========================================================================

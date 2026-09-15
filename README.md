@@ -45,15 +45,9 @@ Then open <http://127.0.0.1:4321>. Opening `index.html` directly from the filesy
 
 ## Deploying
 
-It is a static site plus one serverless function. Push the repo and point Vercel at it — no configuration, no framework preset, no build command.
+It is a static site. Push the repo and point Vercel at it — no configuration, no framework preset, no build command. Every other static host works the same way.
 
-The function, `api/sightings.js`, powers rider tracking and needs a database, which takes a minute to add:
-
-1. In the Vercel dashboard, open the project → **Storage** → **Create** → **Upstash for Redis** (free tier is plenty).
-2. Connect it to this project. Vercel adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` to the environment by itself.
-3. Redeploy.
-
-Until then the Track page says tracking is not switched on, and everything else works as before. On any other static host the whole app works except tracking.
+Rider tracking stores its reports in Firebase (Cloud Firestore), straight from the browser; see [Rider tracking](#rider-tracking) for the one-time setup.
 
 The only external request the app ever makes is loading Leaflet and OSM tiles for the optional map, and it is lazy: the app is fully functional with no network at all.
 
@@ -621,16 +615,27 @@ Reports show up on the Track page for 90 minutes, newest first, with several rid
 
 Everything is labelled as a rider report with its age. It is never called live and never replaces the timetable.
 
-**No accounts.** Registration would kill it — nobody signs up to tell strangers a bus came. So:
+**No accounts.** Registration would kill it — nobody signs up to tell strangers a bus came. The phone signs in to Firebase *anonymously*: no screen, no name, no email, just a random id Firebase keeps on the phone so the rules can tell one phone from another.
 
-- Nothing about the reporter is stored: no name, no account, no location. A report is a stop id, a route id and the server's clock.
-- Only real stop/route combinations from `data/shuttle-data.js` are accepted; the server loads the same data file as the app.
-- One report per phone per 45 seconds, keyed on a random id the phone generates itself plus a one-way hash of the network address that changes every hour. The random id matters because campus Wi-Fi puts many phones behind one address; a looser per-address cap (40 per 10 minutes) keeps rotating that id from making spam free.
-- The server trims reports older than three hours on every write.
+- A report is a stop id, a route id and the server's time. Nothing about the reporter is stored with it.
+- `firestore.rules` accepts a report only for a stop and route that really go together (generated from `data/shuttle-data.js`), with the server's own timestamp, and nothing can be edited or deleted afterwards.
+- One report per phone per 45 seconds: each report is written in a batch together with a tiny `throttle/{uid}` document, and the rules only accept the report if that marker moves in the same batch, and only let it move once the cooldown has passed.
+- The app keeps a live listener on the last 90 minutes of reports instead of polling, which is both quicker and cheaper, and drops it while the app is in the background.
 
-Tuning lives in `config.tracking` in `data/shuttle-data.js`, read by both the app and the function.
+Tuning lives in `config.tracking` in `data/shuttle-data.js`.
 
-*Why not Firebase?* It works without a sign-in screen too — **Anonymous Authentication** signs every visitor in silently, and security rules can then allow writes from any signed-in user. It was not used here because it means shipping the Firebase SDK and a config to the browser and managing rules, where one small function next to the app keeps the database key server-side and needs no packages at all.
+### Setting up Firebase
+
+The project config is in `data/firebase-config.js` (it is a public identifier, not a secret — the rules protect the data). To use a different project, replace it; to switch tracking off, set it to `null`.
+
+In the [Firebase console](https://console.firebase.google.com/):
+
+1. **Authentication → Sign-in method → Anonymous** → enable.
+2. **Firestore Database → Create database** → a region near Hong Kong (`asia-east2`) → production mode.
+3. **Firestore Database → Rules** → replace everything with the contents of `firestore.rules` → **Publish**.
+4. **Firestore Database → TTL policies** (under the database settings) → create a policy on collection `sightings`, field `expireAt`. Firestore then deletes reports after `keepMinutes` on its own.
+
+When routes or stops change, run `node scripts/build-firestore-rules.js` and publish the rules again, or reports from new stops will be refused.
 
 ## Deliberately not built (v1)
 

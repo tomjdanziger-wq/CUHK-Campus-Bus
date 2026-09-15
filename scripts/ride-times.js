@@ -63,7 +63,11 @@ async function fetchAll() {
     const docs = rows.filter((r) => r.document).map((r) => r.document.fields);
     docs.forEach((f) => out.push({
       trip: f.trip?.stringValue, route: f.route?.stringValue, stop: f.stop?.stringValue,
-      i: f.i ? +f.i.integerValue : null, t: Date.parse(f.t?.timestampValue),
+      i: f.i ? +f.i.integerValue : null,
+      // When the bus got there, if the phone said; the server's receive time
+      // otherwise (which can lag behind when signal was poor).
+      t: Date.parse(f.at?.timestampValue || f.t?.timestampValue),
+      auto: f.auto?.booleanValue === true,
     }));
     if (docs.length < 200) break;
     after = docs[docs.length - 1].t.timestampValue;

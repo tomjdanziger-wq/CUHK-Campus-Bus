@@ -626,9 +626,21 @@ Tuning lives in `config.tracking` in `data/shuttle-data.js`.
 
 ### Logging a ride
 
-After reporting, the page switches to the ride: one big button naming the next stop on the route. Tap it each time the bus gets there; "Bus didn't stop here" moves on without a report, and "I got off" ends it. The ride survives closing the app, and ends by itself after 40 minutes without a tap.
+After reporting, the page switches to the ride. **While the app is open, stops log themselves from the phone's location**, and the ride ends by itself when you walk away from the route ("Looks like you got off at …", with a one-tap *Still on the bus?* in case GPS guessed wrong). A big button naming the next stop is there for tapping by hand when GPS is poor; "Bus didn't stop here" moves on without a report, and "I got off" ends it. The ride survives closing the app and ends by itself after 40 minutes with nothing logged.
 
-Each tap is an ordinary report with the same ride id, so everyone else sees where that bus is now ("rider on board, logging stops") rather than a trail of every stop it passed. The next stop of the same ride only needs a 10-second gap, not the 45-second cooldown.
+**It cannot run in the background.** A web page gets no location with the screen locked or the app switched away — iOS and Android both pause it — so the screen is kept awake during a ride (Screen Wake Lock, where the browser allows it), and whatever the app misses while closed simply leaves a gap. Truly in-pocket tracking would need a native app.
+
+Location never leaves the phone: it only decides *when* to send an ordinary report. How the following works (`lib/ridefollow.js`):
+
+- It tracks how far along the route's actual road the bus has got, searching forwards only and taking the earliest stretch that fits, never the nearest. Campus roads double back: Route 4 passes the United College stop on its way to New Asia and comes back to it later, and matching by distance alone logged United College first.
+- A stretch of road only fits if it runs the way the phone is moving. Route 4 goes out and back along the same road near C.W. Chu, where both directions are within reach of the same fix.
+- A stop counts when the phone reaches the stop's point *on the road*, not its map pin. Some pins sit well off the carriageway (Campus Circuit East is 64 m away).
+- A jump of more than 120 m along the road needs a second fix to agree, and fixes vaguer than 60 m are ignored, so a single wild fix cannot move the bus.
+- "Got off" is three consecutive good fixes more than 80 m from the road just ahead or just behind.
+
+`scripts/smoke-test.js` drives five noisy simulated rides along every route and fails if any stop is missed or anyone is told they got off mid-ride, then checks that walking away is noticed. Under much harsher noise (±9 m jitter, 6% wild fixes up to 220 m, 10% dropped fixes) about 1 ride in 20 misses a stop — which only leaves a gap — and about 1 in 250 is wrongly ended. Thresholds are the `gps…` entries in `config.tracking`.
+
+Each report is an ordinary report with the same ride id, so everyone else sees where that bus is now ("rider on board, logging stops") rather than a trail of every stop it passed. It records when the bus reached the stop by the phone's clock (`at`), so waiting for signal or for the 10-second gap between reports does not distort the timing, and whether GPS or a tap logged it (`auto`).
 
 To turn the logs into ride times:
 

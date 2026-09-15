@@ -58,7 +58,7 @@ ${map}
       allow list: if request.query.limit <= 200;
 
       allow create: if request.auth != null
-        && request.resource.data.keys().hasOnly(['stop', 'route', 'i', 'trip', 't', 'expireAt'])
+        && request.resource.data.keys().hasOnly(['stop', 'route', 'i', 'trip', 't', 'at', 'auto', 'expireAt'])
         && request.resource.data.stop is string
         && request.resource.data.route is string
         && request.resource.data.i is int
@@ -66,6 +66,13 @@ ${map}
         && request.resource.data.trip is string
         && request.resource.data.trip.size() >= 8 && request.resource.data.trip.size() <= 32
         && request.resource.data.t == request.time
+        // When the bus got there by the phone's clock: a report can wait a
+        // while for signal or the cooldown, but not come from the future.
+        && (!('at' in request.resource.data)
+            || (request.resource.data.at is timestamp
+                && request.resource.data.at <= request.time + duration.value(2, 'm')
+                && request.resource.data.at >= request.time - duration.value(60, 'm')))
+        && (!('auto' in request.resource.data) || request.resource.data.auto is bool)
         && request.resource.data.expireAt is timestamp
         // Kept long enough to measure ride times across a term.
         && request.resource.data.expireAt <= request.time + duration.value(${T.keepDays + 1}, 'd')

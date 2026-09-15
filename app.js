@@ -2008,7 +2008,8 @@
    * this ride. Rejects with { code } — 'off', 'permission-denied' (cooldown),
    * 'slow', or whatever Firestore said.
    */
-  function postSighting(route, i, stop, trip) {
+  function postSighting(route, i, stop, trip, extra) {
+    extra = extra || {};
     return firebaseReady().then(function (db) {
       var fb = window.firebase;
       var uid = fb.auth().currentUser.uid;
@@ -2019,11 +2020,17 @@
       // batch, and only let the marker move once the cooldown has passed —
       // a short one when it is the next stop of the same ride.
       var batch = db.batch();
-      batch.set(db.collection('sightings').doc(), {
+      var doc = {
         stop: stop, route: route, i: i, trip: trip, t: now,
         // Firestore's TTL policy deletes the document after this time.
         expireAt: fb.firestore.Timestamp.fromMillis(Date.now() + TRACK.keepDays * 86400000)
-      });
+      };
+      // When the bus actually got there, by the phone's clock. Differs from
+      // `t` when the report had to wait for signal or for the cooldown, and
+      // it is what the ride-time measurement uses.
+      if (extra.at) doc.at = fb.firestore.Timestamp.fromMillis(extra.at);
+      if (extra.auto) doc.auto = true;
+      batch.set(db.collection('sightings').doc(), doc);
       batch.set(db.collection('throttle').doc(uid), { t: now, trip: trip });
 
       // Firestore never fails a write for lack of signal; it queues it and
@@ -2076,9 +2083,11 @@
       // Straight into logging the ride: the next useful tap is the next stop,
       // and "I got off" is one tap away for anyone who only wanted to report.
       track.ride = { trip: trip, route: route.id, i: i,
-                     log: [{ i: i, stop: stop, t: Date.now() }], nextAllowed: Date.now() + TRACK.rideTapSeconds * 1000 };
+                     log: [{ i: i, stop: stop, t: Date.now() }], queue: [],
+                     nextAllowed: Date.now() + TRACK.rideTapSeconds * 1000, follow: true };
       saveRide();
       renderTrackMode();
+      startRideFollow();
       fetchSightings();
     }
   }
@@ -2096,7 +2105,12 @@
     try {
       var r = JSON.parse(localStorage.getItem('ride') || 'null');
       var last = r && r.log && r.log.length ? r.log[r.log.length - 1].t : 0;
-      if (r && routeById(r.route) && Date.now() - last < TRACK.rideIdleMinutes * 60000) return r;
+      if (r && routeById(r.route) && Date.now() - last < TRACK.rideIdleMinutes * 60000) {
+        r.sending = false;             // a send cut off by closing the app
+        delete r.pumpTimer;
+        r.queue = r.queue || [];
+        return r;
+      }
       localStorage.removeItem('ride');
     } catch (e) { /* ignore */ }
     return null;
@@ -2114,7 +2128,10 @@
   }
 
   function endRide(message) {
+    stopRideFollow();
     track.ride = null;
+    track.endedRide = null;
+    $('report-undo').hidden = true;
     saveRide();
     renderTrackMode();
     $('report-status').textContent = message || '';
@@ -2135,57 +2152,107 @@
       return;
     }
     var nextStop = stopById(route.stops[next]);
-    var wait = Math.ceil((ride.nextAllowed - Date.now()) / 1000);
-    tap.disabled = wait > 0 || !!ride.sending;
-    tap.textContent = ride.sending ? 'Sending…'
-      : 'At ' + (nextStop ? nextStop.name : 'the next stop') + (wait > 0 ? ' (' + wait + ' s)' : '');
-    $('ride-skip').disabled = !!ride.sending;
+    tap.disabled = false;
+    tap.textContent = 'At ' + (nextStop ? nextStop.name : 'the next stop');
+
+    var follow = $('ride-follow');
+    var f = track.follow;
+    follow.setAttribute('aria-pressed', String(!!ride.follow));
+    follow.textContent = !ride.follow ? 'Log stops from my location'
+      : f && f.error ? 'Location unavailable — tap the stops instead'
+      : f && f.fixes ? 'Logging stops from your location · keep the app open'
+      : 'Waiting for your location…';
+
+    var queued = (ride.queue || []).length;
+    $('ride-queue').textContent = queued
+      ? queued + (queued === 1 ? ' stop' : ' stops') + ' waiting to send' : '';
 
     var log = $('ride-log');
     log.innerHTML = '';
     ride.log.slice().reverse().forEach(function (e, k, arr) {
       var li = el('li', 'ride__entry');
       var st = stopById(e.stop);
-      li.appendChild(el('span', 'ride__stop', st ? st.name : e.stop));
+      var name = el('span', 'ride__stop', st ? st.name : e.stop);
+      if (e.auto) name.appendChild(el('span', 'ride__auto', ' · GPS'));
+      li.appendChild(name);
       var prev = arr[k + 1];
       li.appendChild(el('span', 'ride__time',
         clock(e.t) + (prev ? ' · +' + span(e.t - prev.t) : ' · got on')));
       log.appendChild(li);
     });
+  }
 
-    if (wait > 0) setTimeout(function () { if (track.ride === ride) renderRide(); }, 1000);
+  /**
+   * The bus has reached stop `j` on the route at time `t`. Logged at once;
+   * sent when the cooldown and the signal allow, in order. Stops between the
+   * last one and `j` were passed without a report, which leaves a gap the
+   * ride-time measurement skips over.
+   */
+  function recordArrival(j, t, auto) {
+    var ride = track.ride;
+    if (!ride || j <= ride.i) return;
+    var route = routeById(ride.route);
+    if (j >= route.stops.length) return;
+    var entry = { i: j, stop: route.stops[j], t: t, auto: !!auto };
+    ride.i = j;
+    ride.log.push(entry);
+    ride.queue = ride.queue || [];
+    ride.queue.push(entry);
+    saveRide();
+    renderRide();
+    pumpRide();
+  }
+
+  function pumpRide() {
+    var ride = track.ride;
+    if (!ride || ride.sending || !ride.queue || !ride.queue.length) return;
+    var wait = ride.nextAllowed - Date.now();
+    if (wait > 0) {
+      clearTimeout(ride.pumpTimer);
+      ride.pumpTimer = setTimeout(pumpRide, wait + 50);
+      return;
+    }
+
+    var e = ride.queue[0];
+    ride.sending = true;
+    postSighting(ride.route, e.i, e.stop, ride.trip, { at: e.t, auto: e.auto })
+      .then(sent, function (err) {
+        if (err && err.code === 'slow') return sent();   // Firestore queued it
+        ride.sending = false;
+        if (track.ride !== ride) return;
+        if (err && err.code === 'off') { $('ride-status').textContent = describeFailure(err); return; }
+        // Cooldown, or no signal: try again shortly. Nothing is lost.
+        ride.nextAllowed = Date.now() + (err && err.code === 'permission-denied'
+          ? TRACK.rideTapSeconds * 1000 : 15000);
+        e.attempts = (e.attempts || 0) + 1;
+        if (e.attempts > 8) ride.queue.shift();
+        saveRide();
+        renderRide();
+        pumpRide();
+      });
+
+    function sent() {
+      ride.sending = false;
+      if (track.ride !== ride) return;
+      ride.queue.shift();
+      ride.nextAllowed = Date.now() + TRACK.rideTapSeconds * 1000;
+      $('ride-status').textContent = '';
+      saveRide();
+      renderRide();
+      pumpRide();
+    }
   }
 
   function rideTap() {
+    if (!track.ride) return;
+    recordArrival(track.ride.i + 1, Date.now(), false);
+    syncProgress();
+  }
+
+  /** After a tap or skip, GPS carries on from that stop's point on the road. */
+  function syncProgress() {
     var ride = track.ride;
-    if (!ride || ride.sending) return;
-    var route = routeById(ride.route);
-    var next = ride.i + 1;
-    var stop = route.stops[next];
-    var status = $('ride-status');
-    ride.sending = true;
-    renderRide();
-
-    postSighting(route.id, next, stop, ride.trip).then(logged, function (err) {
-      if (err && err.code === 'slow') return logged();
-      ride.sending = false;
-      status.textContent = describeFailure(err, 'Too quick — wait a few seconds and tap again.');
-      if (err && err.code === 'permission-denied') ride.nextAllowed = Date.now() + TRACK.rideTapSeconds * 1000;
-      renderRide();
-    });
-
-    // The time is recorded on tap, not on the server's reply, so a slow
-    // network does not stretch the measurement. (The server keeps its own.)
-    var tappedAt = Date.now();
-    function logged() {
-      ride.sending = false;
-      ride.i = next;
-      ride.log.push({ i: next, stop: stop, t: tappedAt });
-      ride.nextAllowed = Date.now() + TRACK.rideTapSeconds * 1000;
-      status.textContent = '';
-      saveRide();
-      renderRide();
-    }
+    if (ride && track.follow) follower.syncToStop(track.follow, DATA.routeShapes[ride.route], ride.i);
   }
 
   function rideSkip() {
@@ -2194,9 +2261,99 @@
     // The bus drove past without stopping. Move on without a report — and
     // the gap in the log keeps this hop out of the timing.
     ride.i += 1;
+    syncProgress();
     saveRide();
     renderRide();
   }
+
+  // ---- following the ride by GPS ------------------------------------------
+  //
+  // While the app is open, the phone's location logs each stop by itself and
+  // notices when you have got off. A web page cannot do this with the screen
+  // locked or the app in the background — iOS and Android pause it — so the
+  // screen is kept awake during a ride, and the buttons stay for when GPS is
+  // poor (it often is between tall buildings) or the app was closed.
+
+  var follower = window.CUHK.rideFollow;
+
+  function onRideFix(pos) {
+    var ride = track.ride;
+    var f = track.follow;
+    if (!ride || !f) return;
+    var fix = { lat: pos.coords.latitude, lng: pos.coords.longitude,
+                accuracy: pos.coords.accuracy || 999 };
+    f.fixes = (f.fixes || 0) + 1;
+    f.error = null;
+    liveState().fix = fix;                          // the blue dot on the maps
+
+    var route = routeById(ride.route);
+    var byId = {};
+    DATA.stops.forEach(function (st) { byId[st.id] = st; });
+    var res = follower.step(f, ride, fix, route, DATA.routeShapes[ride.route], byId, TRACK);
+
+    if (res.arrived >= 0) recordArrival(res.arrived, pos.timestamp || Date.now(), true);
+
+    if (res.gotOff) {
+      var last = ride.log[ride.log.length - 1];
+      var lastStop = last && stopById(last.stop);
+      var n = ride.log.length;
+      endRide('Looks like you got off' + (lastStop ? ' at ' + lastStop.name : '') +
+              '. ' + (n > 1 ? n + ' stops logged — thank you!' : 'Thanks for reporting!'));
+      // GPS guesses wrong now and then. One tap puts the ride back.
+      track.endedRide = ride;
+      $('report-undo').hidden = false;
+      return;
+    }
+    if (track.ride && track.ride.i >= route.stops.length - 1) {
+      endRide('End of the route. ' + track.ride.log.length + ' stops logged — thank you!');
+      return;
+    }
+    if (track.ride) renderRide();
+  }
+
+  function startRideFollow() {
+    var ride = track.ride;
+    if (!ride || !ride.follow || track.follow || !navigator.geolocation) return;
+    track.follow = { watchId: null, fixes: 0, offRoute: 0, error: null, lock: null };
+    try {
+      track.follow.watchId = navigator.geolocation.watchPosition(onRideFix, function (err) {
+        if (!track.follow) return;
+        track.follow.error = err;
+        if (track.ride) renderRide();
+      }, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+    } catch (e) {
+      track.follow.error = e;
+    }
+    keepAwake();
+    renderRide();
+  }
+
+  function stopRideFollow() {
+    var f = track.follow;
+    if (!f) return;
+    if (f.watchId !== null) { try { navigator.geolocation.clearWatch(f.watchId); } catch (e) {} }
+    if (f.lock) { try { f.lock.release(); } catch (e) {} }
+    track.follow = null;
+  }
+
+  /** Stop the phone locking itself mid-ride, where the browser allows it. */
+  function keepAwake() {
+    var f = track.follow;
+    if (!f || !navigator.wakeLock || document.hidden) return;
+    navigator.wakeLock.request('screen').then(function (lock) {
+      if (track.follow === f) f.lock = lock; else lock.release();
+    }).catch(function () { /* not allowed here; the ride still works */ });
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (!track.ride) return;
+    if (document.hidden) {
+      stopRideFollow();
+    } else {
+      startRideFollow();   // picks up again, and re-takes the wake lock
+      pumpRide();
+    }
+  });
 
   /** The Track page shows either the ride in progress or the report form. */
   function renderTrackMode() {
@@ -2299,11 +2456,30 @@
     $('report-send').addEventListener('click', sendReport);
     $('ride-tap').addEventListener('click', rideTap);
     $('ride-skip').addEventListener('click', rideSkip);
+    $('report-undo').addEventListener('click', function () {
+      var ride = track.endedRide;
+      if (!ride) return;
+      track.endedRide = null;
+      $('report-undo').hidden = true;
+      $('report-status').textContent = '';
+      track.ride = ride;
+      saveRide();
+      renderTrackMode();
+      startRideFollow();
+      pumpRide();
+    });
+    $('ride-follow').addEventListener('click', function () {
+      if (!track.ride) return;
+      track.ride.follow = !track.ride.follow;
+      saveRide();
+      if (track.ride.follow) startRideFollow(); else { stopRideFollow(); renderRide(); }
+    });
     $('ride-end').addEventListener('click', function () {
       var n = track.ride ? track.ride.log.length : 0;
       endRide(n > 1 ? 'Thanks — ' + n + ' stops logged.' : '');
     });
     track.ride = loadRide();
+    if (track.ride) { startRideFollow(); pumpRide(); }
 
     fetchSightings();
     // New reports arrive through the listener. This only re-draws the ages

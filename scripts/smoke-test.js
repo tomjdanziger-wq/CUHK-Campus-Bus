@@ -113,6 +113,67 @@ console.log(`planner: ${checked} journeys checked, ${lastChecked} last-bus looku
 
 console.log(problems.length ? problems.slice(0, 15).join('\n') : '  no problems');
 
+// GPS ride following: drive every route stop to stop with noisy fixes and
+// the odd wild one. Every stop must be logged, in order, and nobody may be
+// told they got off mid-ride. Then walk away from the road and they must be.
+require('../lib/ridefollow.js');
+{
+  const follow = globalThis.CUHK.rideFollow;
+  const T = D.config.tracking;
+  const byId = {};
+  D.stops.forEach((st) => { byId[st.id] = st; });
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  let rides = 0;
+
+  D.routes.forEach((route) => {
+    const shape = D.routeShapes[route.id];
+    if (!shape || !shape.stopIndices) return;
+    for (let run = 0; run < 5; run++) {
+      rides++;
+      const f = {}, ride = { i: 0 };
+      const logged = [];
+      let ended = false;
+      const idx = shape.stopIndices;
+      for (let k = idx[0]; k <= idx[idx.length - 1] && !ended; k++) {
+        const [lat, lng] = shape.line[k];
+        const fixes = [{ lat: lat + (rand() - 0.5) * 0.0001, lng: lng + (rand() - 0.5) * 0.0001,
+                         accuracy: 8 + rand() * 30 }];
+        if (rand() < 0.04) fixes.push({ lat: lat + 0.0015, lng, accuracy: 25 });   // a wild fix
+        fixes.forEach((fix) => {
+          const r = follow.step(f, ride, fix, route, shape, byId, T);
+          if (r.arrived >= 0) { logged.push(r.arrived); ride.i = r.arrived; }
+          if (r.gotOff) ended = true;
+        });
+      }
+      if (ended) problems.push(`ride-follow: route ${route.id} run ${run} said "got off" mid-ride after stop ${ride.i}`);
+      const want = route.stops.map((_, i) => i).slice(1);
+      if (logged.join() !== want.join()) {
+        problems.push(`ride-follow: route ${route.id} run ${run} logged [${logged}] expected [${want}]`);
+      }
+    }
+
+    // Walking off after the second stop.
+    const f = {}, ride = { i: 0 };
+    let gotOff = false;
+    for (let k = shape.stopIndices[0]; k <= shape.stopIndices[2]; k++) {
+      const [lat, lng] = shape.line[k];
+      const r = follow.step(f, ride, { lat, lng, accuracy: 10 }, route, shape, byId, T);
+      if (r.arrived >= 0) ride.i = r.arrived;
+      if (r.gotOff) gotOff = true;
+    }
+    const [lat, lng] = shape.line[shape.stopIndices[2]];
+    for (let w = 1; w <= 4 && !gotOff; w++) {
+      // Straight away from campus roads, 150 m and more.
+      const r = follow.step(f, ride, { lat: lat + 0.0014 * w, lng: lng + 0.0014 * w, accuracy: 12 },
+                            route, shape, byId, T);
+      if (r.gotOff) gotOff = true;
+    }
+    if (!gotOff) problems.push(`ride-follow: route ${route.id} did not notice the rider walking off`);
+  });
+  console.log(`ride follow: ${rides} simulated rides`);
+}
+
 // walk router health
 let routed = 0, failed = 0;
 for (let i = 0; i < pool.length; i += 3) {
@@ -132,6 +193,7 @@ for (const r of D.routes) {
 console.log('shapes: checked');
 
 if (problems.length) {
+  console.error(problems.slice(0, 40).join("\n"));
   console.error(`\n${problems.length} problem(s) found.`);
   process.exit(1);
 }

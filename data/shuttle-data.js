@@ -217,6 +217,15 @@
       rideTapSeconds: 10,     // ...but the next stop of the same ride only
                               // needs this long (stops can be close)
       rideIdleMinutes: 40,    // a ride with no tap for this long is over
+      // Following a ride by GPS (only while the app is open):
+      gpsMaxAccuracyMetres: 60, // ignore fixes vaguer than this
+      gpsStopRadiusMetres: 45,  // within this of a stop = the bus is there
+      gpsOffRouteMetres: 80,    // this far from the route, three fixes in a
+                                // row = you got off
+      gpsMaxJumpMetres: 250,    // how far along the road one fix may move
+                                // the bus (more than it drives between fixes)
+      gpsConfirmJumpMetres: 120, // a move further than this needs a second
+                                // fix to agree (one stray fix is not a bus)
       cardMaxAgeMinutes: 20,  // a report older than this is not shown on a trip
       confirmWindowMinutes: 5 // reports of the same bus at the same stop this
                               // close together count as one, seen by several

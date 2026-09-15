@@ -2009,6 +2009,16 @@
    * 'slow', or whatever Firestore said.
    */
   function postSighting(route, i, stop, trip, extra) {
+    return postRideEvent('sightings', route, i, stop, trip, extra);
+  }
+
+  /** Where a rider got off. `how`: 'gps' (guessed and accepted), 'tap'
+   *  (they said "I got off" at the stop we had them at), 'picked' (chose it). */
+  function postAlighting(route, i, stop, trip, at, how) {
+    return postRideEvent('alightings', route, i, stop, trip, { at: at, how: how });
+  }
+
+  function postRideEvent(collection, route, i, stop, trip, extra) {
     extra = extra || {};
     return firebaseReady().then(function (db) {
       var fb = window.firebase;
@@ -2030,7 +2040,8 @@
       // it is what the ride-time measurement uses.
       if (extra.at) doc.at = fb.firestore.Timestamp.fromMillis(extra.at);
       if (extra.auto) doc.auto = true;
-      batch.set(db.collection('sightings').doc(), doc);
+      if (extra.how) doc.how = extra.how;
+      batch.set(db.collection(collection).doc(), doc);
       batch.set(db.collection('throttle').doc(uid), { t: now, trip: trip });
 
       // Firestore never fails a write for lack of signal; it queues it and
@@ -2129,9 +2140,8 @@
 
   function endRide(message) {
     stopRideFollow();
+    if (track.ride) clearTimeout(track.ride.endTimer);
     track.ride = null;
-    track.endedRide = null;
-    $('report-undo').hidden = true;
     saveRide();
     renderTrackMode();
     $('report-status').textContent = message || '';
@@ -2144,6 +2154,10 @@
     title.innerHTML = '';
     title.appendChild(routeBadge(route));
     title.appendChild(document.createTextNode(' On ' + route.name));
+
+    $('ride-live').hidden = !!ride.ending;
+    $('ride-off').hidden = !ride.ending;
+    if (ride.ending) { renderEnding(); renderRideLog(); return; }
 
     var next = ride.i + 1;
     var tap = $('ride-tap');
@@ -2167,6 +2181,11 @@
     $('ride-queue').textContent = queued
       ? queued + (queued === 1 ? ' stop' : ' stops') + ' waiting to send' : '';
 
+    renderRideLog();
+  }
+
+  function renderRideLog() {
+    var ride = track.ride;
     var log = $('ride-log');
     log.innerHTML = '';
     ride.log.slice().reverse().forEach(function (e, k, arr) {
@@ -2243,6 +2262,156 @@
     }
   }
 
+  // ---- getting off ----------------------------------------------------------
+
+  var AUTO_SAVE_SECONDS = 60;
+
+  /**
+   * Ask where the rider got off. From GPS it is a guess, shown with a
+   * countdown and saved by itself if nobody answers — most people will have
+   * put the phone away by then. From "I got off" it waits for them.
+   */
+  function startEnding(i, how, at) {
+    var ride = track.ride;
+    if (!ride) return;
+    stopRideFollow();
+    ride.ending = { i: i, how: how, at: at, picked: false,
+                    deadline: how === 'gps' ? Date.now() + AUTO_SAVE_SECONDS * 1000 : null };
+    saveRide();
+    renderRide();
+    tickEnding();
+  }
+
+  function tickEnding() {
+    var ride = track.ride;
+    if (!ride || !ride.ending) return;
+    clearTimeout(ride.endTimer);
+    if (ride.ending.deadline && !ride.ending.picked) {
+      if (Date.now() >= ride.ending.deadline) { confirmEnding(); return; }
+      ride.endTimer = setTimeout(function () { renderEnding(); tickEnding(); }, 1000);
+    }
+  }
+
+  /** The stops someone could plausibly have got off at: from where they got
+   *  on to a few stops past the last one logged. */
+  function endingCandidates(ride) {
+    var route = routeById(ride.route);
+    var from = ride.log.length ? ride.log[0].i : 0;
+    var to = Math.min(route.stops.length - 1, ride.i + 3);
+    var out = [];
+    for (var i = from; i <= to; i++) out.push(i);
+    return out;
+  }
+
+  function renderEnding() {
+    var ride = track.ride;
+    var e = ride.ending;
+    var route = routeById(ride.route);
+    var chosen = stopById(route.stops[e.i]);
+
+    $('ride-off-question').textContent = e.how === 'gps' && !e.picked
+      ? 'Looks like you got off at ' + (chosen ? chosen.name : 'this stop') + '. Right?'
+      : 'Where did you get off?';
+
+    var box = $('ride-off-stops');
+    box.innerHTML = '';
+    endingCandidates(ride).slice().reverse().forEach(function (i) {
+      var st = stopById(route.stops[i]);
+      if (!st) return;
+      var b = el('button', 'report__stop');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(i === e.i));
+      b.appendChild(el('span', 'report__stopname', st.name));
+      var logged = ride.log.filter(function (x) { return x.i === i; })[0];
+      if (logged) b.appendChild(el('span', 'report__stopdist', clock(logged.t).slice(0, 5)));
+      b.addEventListener('click', function () {
+        e.i = i;
+        e.picked = true;          // a person chose it: stop the countdown
+        e.how = 'picked';
+        clearTimeout(ride.endTimer);
+        saveRide();
+        renderEnding();
+      });
+      box.appendChild(b);
+    });
+
+    $('ride-off-confirm').textContent = 'Got off at ' + (chosen ? chosen.name : 'this stop');
+    var left = e.deadline && !e.picked ? Math.ceil((e.deadline - Date.now()) / 1000) : 0;
+    $('ride-off-countdown').textContent = left > 0 ? 'Saved automatically in ' + left + ' s' : '';
+  }
+
+  function confirmEnding() {
+    var ride = track.ride;
+    if (!ride || !ride.ending || ride.ending.saving) return;
+    var e = ride.ending;
+    var route = routeById(ride.route);
+    var stop = route.stops[e.i];
+    var name = (stopById(stop) || {}).name || 'your stop';
+    var n = ride.log.length;
+    e.saving = true;
+    clearTimeout(ride.endTimer);
+
+    // Whatever is still queued goes first, so the rules see the same ride.
+    var send = function () {
+      return postAlighting(route.id, e.i, stop, ride.trip,
+                           e.how === 'picked' ? Date.now() : e.at, e.how);
+    };
+    var done = function () {
+      endRide('Got off at ' + name + ' — logged' +
+              (n > 1 ? ', with ' + n + ' stops. Thank you!' : '. Thank you!'));
+    };
+    waitForQueue(ride).then(send).then(done, function (err) {
+      if (err && err.code === 'slow') return done();
+      e.saving = false;
+      if (err && err.code === 'permission-denied') {
+        // The 10 s gap since the last stop was sent. Try once more.
+        setTimeout(function () { if (track.ride === ride) confirmEnding(); }, TRACK.rideTapSeconds * 1000);
+        return;
+      }
+      $('ride-status').textContent = describeFailure(err);
+      renderRide();
+    });
+  }
+
+  function waitForQueue(ride) {
+    return new Promise(function (resolve) {
+      (function check() {
+        if (track.ride !== ride || !ride.queue || !ride.queue.length) {
+          var wait = Math.max(0, (ride.nextAllowed || 0) - Date.now());
+          return setTimeout(resolve, wait);
+        }
+        pumpRide();
+        setTimeout(check, 500);
+      })();
+    });
+  }
+
+  function cancelEnding() {
+    var ride = track.ride;
+    if (!ride || !ride.ending) return;
+    clearTimeout(ride.endTimer);
+    ride.ending = null;
+    saveRide();
+    renderRide();
+    startRideFollow();
+  }
+
+  /** "I got off": our best guess at where, for them to confirm or change. */
+  function guessStopNow(ride) {
+    var route = routeById(ride.route);
+    var fix = state.live && state.live.fix;
+    var shape = DATA.routeShapes[ride.route];
+    if (!fix || !shape || !shape.stopIndices || fix.accuracy > TRACK.gpsMaxAccuracyMetres) return ride.i;
+    var best = ride.i, bestD = Infinity;
+    endingCandidates(ride).forEach(function (i) {
+      var k = shape.stopIndices[i];
+      if (typeof k !== 'number') return;
+      var d = geo.haversineMetres(fix, { lat: shape.line[k][0], lng: shape.line[k][1] });
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return bestD <= 150 ? best : ride.i;
+  }
+
   function rideTap() {
     if (!track.ride) return;
     recordArrival(track.ride.i + 1, Date.now(), false);
@@ -2294,16 +2463,14 @@
     if (res.arrived >= 0) recordArrival(res.arrived, pos.timestamp || Date.now(), true);
 
     if (res.gotOff) {
-      var last = ride.log[ride.log.length - 1];
-      var lastStop = last && stopById(last.stop);
-      var n = ride.log.length;
-      endRide('Looks like you got off' + (lastStop ? ' at ' + lastStop.name : '') +
-              '. ' + (n > 1 ? n + ' stops logged — thank you!' : 'Thanks for reporting!'));
-      // GPS guesses wrong now and then. One tap puts the ride back.
-      track.endedRide = ride;
-      $('report-undo').hidden = false;
+      // Not the end yet: say where we think they got off, and let them
+      // confirm, correct it, or say they are still on. Saved by itself if
+      // they have already put the phone away.
+      startEnding(ride.i, 'gps', f.offSince || Date.now());
       return;
     }
+    // When the walking-away started, for the time they got off.
+    if (f.offRoute === 1) f.offSince = pos.timestamp || Date.now();
     if (track.ride && track.ride.i >= route.stops.length - 1) {
       endRide('End of the route. ' + track.ride.log.length + ' stops logged — thank you!');
       return;
@@ -2350,7 +2517,8 @@
     if (document.hidden) {
       stopRideFollow();
     } else {
-      startRideFollow();   // picks up again, and re-takes the wake lock
+      if (!track.ride.ending) startRideFollow();   // and re-takes the wake lock
+      else tickEnding();
       pumpRide();
     }
   });
@@ -2456,18 +2624,6 @@
     $('report-send').addEventListener('click', sendReport);
     $('ride-tap').addEventListener('click', rideTap);
     $('ride-skip').addEventListener('click', rideSkip);
-    $('report-undo').addEventListener('click', function () {
-      var ride = track.endedRide;
-      if (!ride) return;
-      track.endedRide = null;
-      $('report-undo').hidden = true;
-      $('report-status').textContent = '';
-      track.ride = ride;
-      saveRide();
-      renderTrackMode();
-      startRideFollow();
-      pumpRide();
-    });
     $('ride-follow').addEventListener('click', function () {
       if (!track.ride) return;
       track.ride.follow = !track.ride.follow;
@@ -2475,11 +2631,21 @@
       if (track.ride.follow) startRideFollow(); else { stopRideFollow(); renderRide(); }
     });
     $('ride-end').addEventListener('click', function () {
+      if (!track.ride) return;
+      startEnding(guessStopNow(track.ride), 'tap', Date.now());
+    });
+    $('ride-off-confirm').addEventListener('click', confirmEnding);
+    $('ride-off-back').addEventListener('click', cancelEnding);
+    $('ride-off-skip').addEventListener('click', function () {
       var n = track.ride ? track.ride.log.length : 0;
       endRide(n > 1 ? 'Thanks — ' + n + ' stops logged.' : '');
     });
     track.ride = loadRide();
-    if (track.ride) { startRideFollow(); pumpRide(); }
+    if (track.ride) {
+      if (track.ride.ending) { track.ride.ending.saving = false; tickEnding(); }
+      else startRideFollow();
+      pumpRide();
+    }
 
     fetchSightings();
     // New reports arrive through the listener. This only re-draws the ages

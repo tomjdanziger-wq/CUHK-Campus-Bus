@@ -640,6 +640,8 @@ Location never leaves the phone: it only decides *when* to send an ordinary repo
 
 `scripts/smoke-test.js` drives five noisy simulated rides along every route and fails if any stop is missed or anyone is told they got off mid-ride, then checks that walking away is noticed. Under much harsher noise (±9 m jitter, 6% wild fixes up to 220 m, 10% dropped fixes) about 1 ride in 20 misses a stop — which only leaves a gap — and about 1 in 250 is wrongly ended. Thresholds are the `gps…` entries in `config.tracking`.
 
+**Where people get off** is logged too, in a separate `alightings` collection. When GPS sees you walk off the route, the ride doesn't just end: it asks *"Looks like you got off at University Administration Building. Right?"* with the nearby stops listed, and saves the guess by itself after 60 seconds if nobody answers (the phone is usually in a pocket by then). Tap another stop to correct it, *Still on the bus* to carry on, or *Don't log where*. "I got off" opens the same list, with no countdown, pre-selected at the stop GPS puts you nearest, or else the last stop logged. Each record says how it was decided — `gps`, `tap` or `picked` — so a guess is never mistaken for a rider's answer.
+
 Each report is an ordinary report with the same ride id, so everyone else sees where that bus is now ("rider on board, logging stops") rather than a trail of every stop it passed. It records when the bus reached the stop by the phone's clock (`at`), so waiting for signal or for the 10-second gap between reports does not distort the timing, and whether GPS or a tap logged it (`auto`).
 
 To turn the logs into ride times:

@@ -1110,6 +1110,9 @@ li + li > .results__map { border-top: 1px solid var(--line); }
 .ride__follow[aria-pressed="true"]::before { background: #1a73e8; box-shadow: 0 0 0 3px rgba(26, 115, 232, .25); }
 .ride__auto { font-weight: 400; font-size: 12.5px; color: var(--ink-3); }
 .ride__queue { margin: 6px 0 0; font-size: 13px; color: var(--warn); }
+.ride__offq { margin-top: 12px; font-size: 16px; color: var(--ink); }
+#ride-live[hidden], #ride-off[hidden] { display: none; }
+#ride-off .report__send { margin-top: 12px; }
 .ride__queue:empty { display: none; }
 
 /* A rider report on a trip card: useful, but never mistaken for the timetable. */

@@ -54,6 +54,7 @@
     walk:  'M13.5 5.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM9.8 8.9 7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3A7 7 0 0 0 19 13v-2a5 5 0 0 1-4.2-2.4l-1-1.6c-.4-.6-1-1-1.8-1-.3 0-.5 0-.8.2L6 8.3V13h2V9.6l1.8-.7z',
     bus:   'M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM18 11H6V6h12v5z',
     clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z',
+    signal: 'M7.76 16.24C6.67 15.16 6 13.66 6 12s.67-3.16 1.76-4.24l1.42 1.42C8.45 9.9 8 10.9 8 12c0 1.1.45 2.1 1.17 2.83l-1.41 1.41zm8.48 0C17.33 15.16 18 13.66 18 12s-.67-3.16-1.76-4.24l-1.42 1.42C15.55 9.9 16 10.9 16 12c0 1.1-.45 2.1-1.17 2.83l1.41 1.41zM12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z',
     pin:   'M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z',
     alert: 'M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z',
     info:  'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z',
@@ -644,6 +645,24 @@
     }
     deps.appendChild(times);
     body.appendChild(deps);
+
+    // --- what riders have reported ---
+    var seen = sightingForOption(o);
+    if (seen) {
+      var seenRow = el('p', 'seenline');
+      seenRow.appendChild(icon('signal'));
+      var seenText = el('span', null);
+      seenText.appendChild(el('strong', null, 'Rider report'));
+      seenText.appendChild(document.createTextNode(
+        ' · Route ' + seen.route.id + ' at ' + seen.stop.name + ', ' + agoText(seen.ageMinutes) +
+        // Where that is relative to you is the useful part. Stop order is a
+        // fair guide, not a certainty, on routes that loop.
+        (seen.where === 'before' ? ' — still before your stop'
+          : seen.where === 'at' ? ' — at your stop'
+          : seen.where === 'after' ? ' — already past your stop' : '')));
+      seenRow.appendChild(seenText);
+      body.appendChild(seenRow);
+    }
 
     // --- where the bus goes next ---
     if (o.onwardStops && o.onwardStops.length) {
@@ -1567,7 +1586,7 @@
   // coming back finds it where you left it.
   // =========================================================================
 
-  var PAGE_ROUTES = 0, PAGE_TRIP = 1, PAGE_FOOD = 2;
+  var PAGE_TRACK = 0, PAGE_ROUTES = 1, PAGE_TRIP = 2, PAGE_FOOD = 3;
   var currentPage = PAGE_TRIP;
 
   function goToPage(index, instant) {
@@ -1590,6 +1609,7 @@
     if (index === PAGE_ROUTES) openNetwork();
     // Re-sorted every visit, because "nearest" depends on the current start.
     if (index === PAGE_FOOD) renderFood();
+    if (index === PAGE_TRACK) openTrack();
   }
 
   function wirePager() {
@@ -1706,6 +1726,338 @@
     }
 
     box.hidden = false;
+  }
+
+  // =========================================================================
+  // Track: rider reports
+  //
+  // Someone who has just boarded says where and which bus, in two taps. The
+  // server (api/sightings.js) keeps reports for a few hours with no account
+  // and nothing about the reporter. Everything shown is labelled as a rider
+  // report with its age — never "live", never official.
+  //
+  // Without the server (a local static preview, or before storage is set up
+  // on Vercel) the page says tracking is off and everything else carries on.
+  // =========================================================================
+
+  var SIGHTINGS_URL = 'api/sightings';
+  var TRACK = CFG.tracking || { showMinutes: 90, cooldownSeconds: 45,
+                                cardMaxAgeMinutes: 20, confirmWindowMinutes: 5 };
+
+  var track = {
+    status: 'unknown',     // 'ok' | 'off' | 'error'
+    serverNow: 0,
+    fetchedAt: 0,
+    list: [],
+    stop: null,            // selected stop id
+    route: null,           // selected route id
+    showAllStops: false,
+    cooldownUntil: 0,
+    timer: null
+  };
+
+  function stopById(id) {
+    for (var i = 0; i < DATA.stops.length; i++) if (DATA.stops[i].id === id) return DATA.stops[i];
+    return null;
+  }
+  function routeById(id) {
+    for (var i = 0; i < DATA.routes.length; i++) if (DATA.routes[i].id === id) return DATA.routes[i];
+    return null;
+  }
+
+  /** A random id this phone makes up for itself, so a shared campus Wi-Fi
+   *  address does not throttle everyone at once. Not an account. */
+  function deviceId() {
+    try {
+      var id = localStorage.getItem('deviceId');
+      if (!id) {
+        id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem('deviceId', id);
+      }
+      return id;
+    } catch (e) {
+      return 'anon';
+    }
+  }
+
+  function minutesAgo(t) {
+    var now = track.serverNow + (Date.now() - track.fetchedAt);
+    return Math.max(0, (now - t) / 60000);
+  }
+
+  function agoText(min) {
+    if (min < 1) return 'just now';
+    if (min < 60) return Math.round(min) + ' min ago';
+    return Math.floor(min / 60) + ' h ' + Math.round(min % 60) + ' min ago';
+  }
+
+  function fetchSightings() {
+    return fetch(SIGHTINGS_URL, { cache: 'no-store' }).then(function (r) {
+      // 404: no server at all (static preview). 503: server, no storage yet.
+      if (r.status === 404 || r.status === 503) { track.status = 'off'; return null; }
+      if (!r.ok) throw new Error('status ' + r.status);
+      return r.json();
+    }).then(function (data) {
+      if (!data) return;
+      track.status = 'ok';
+      track.serverNow = data.now;
+      track.fetchedAt = Date.now();
+      track.list = data.sightings || [];
+    }).catch(function () {
+      if (track.status !== 'ok') track.status = 'error';
+    }).then(function () {
+      if (currentPage === PAGE_TRACK) renderSightings();
+      if (state.origin && state.destination) render();
+    });
+  }
+
+  /**
+   * The most recent report of a bus this option could put you on, if it is
+   * recent enough to mean anything.
+   */
+  function sightingForOption(o) {
+    if (track.status !== 'ok' || !track.list.length) return null;
+    var routes = o.routes || [o.route];
+    var ids = routes.map(function (r) { return r.id; });
+    for (var i = 0; i < track.list.length; i++) {       // newest first
+      var sg = track.list[i];
+      if (ids.indexOf(sg.route) === -1) continue;
+      var age = minutesAgo(sg.t);
+      if (age > TRACK.cardMaxAgeMinutes) return null;
+      var route = routeById(sg.route), stop = stopById(sg.stop);
+      if (!route || !stop) continue;
+      var idx = route.stops.indexOf(sg.stop);
+      var boardIdx = route.stops.indexOf(o.boardStop.id);
+      var where = idx === -1 || boardIdx === -1 ? null
+        : idx < boardIdx ? 'before' : idx === boardIdx ? 'at' : 'after';
+      return { route: route, stop: stop, ageMinutes: age, where: where };
+    }
+    return null;
+  }
+
+  /** Where to measure "closest stop" from: where you are, if we know. */
+  function trackReference() {
+    if (state.live && state.live.fix) return state.live.fix;
+    if (state.origin && state.originSource === 'gps') return state.origin;
+    return null;
+  }
+
+  function renderReportStops() {
+    var box = $('report-stops');
+    box.innerHTML = '';
+    var ref = trackReference();
+
+    var stops = DATA.stops.slice();
+    var dist = {};
+    if (ref) {
+      stops.forEach(function (st) { dist[st.id] = geo.haversineMetres(ref, st); });
+      stops.sort(function (a, b) { return dist[a.id] - dist[b.id]; });
+    } else {
+      stops.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    }
+
+    var shown = track.showAllStops || !ref ? stops : stops.slice(0, 6);
+    $('report-more').hidden = track.showAllStops || !ref;
+
+    shown.forEach(function (st) {
+      var b = el('button', 'report__stop');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(track.stop === st.id));
+      b.appendChild(el('span', 'report__stopname', st.name));
+      if (ref) {
+        var d = dist[st.id];
+        b.appendChild(el('span', 'report__stopdist',
+          d < 1000 ? Math.round(d / 10) * 10 + ' m' : (d / 1000).toFixed(1) + ' km'));
+      }
+      b.addEventListener('click', function () {
+        track.stop = st.id;
+        var serving = DATA.routes.filter(function (r) {
+          return r.stops.indexOf(st.id) !== -1 && planner.runsToday(r, new Date());
+        });
+        track.route = serving.length === 1 ? serving[0].id : null;
+        renderReport();
+      });
+      box.appendChild(b);
+    });
+  }
+
+  function renderReport() {
+    renderReportStops();
+
+    var routeBox = $('report-route-box');
+    var chips = $('report-routes');
+    chips.innerHTML = '';
+    routeBox.hidden = !track.stop;
+    if (track.stop) {
+      // Only buses that run today: nobody just boarded the holiday service
+      // on a Tuesday. If that leaves nothing (a data gap), offer them all.
+      var serving = DATA.routes.filter(function (r) { return r.stops.indexOf(track.stop) !== -1; });
+      var today = serving.filter(function (r) { return planner.runsToday(r, new Date()); });
+      (today.length ? today : serving)
+        .forEach(function (r) {
+          var c = el('button', 'chip chip--colour');
+          c.type = 'button';
+          c.style.setProperty('--chip-colour', r.colour);
+          c.setAttribute('aria-pressed', String(track.route === r.id));
+          c.appendChild(el('span', 'chip__dot'));
+          c.appendChild(el('span', null, r.id));
+          c.title = r.name + (r.label ? ' · ' + r.label : '');
+          c.addEventListener('click', function () { track.route = r.id; renderReport(); });
+          chips.appendChild(c);
+        });
+    }
+
+    var send = $('report-send');
+    var wait = Math.ceil((track.cooldownUntil - Date.now()) / 1000);
+    if (track.status === 'off') {
+      send.disabled = true;
+      send.textContent = 'Tracking is not switched on yet';
+    } else if (wait > 0) {
+      send.disabled = true;
+      send.textContent = 'Thanks! You can report again in ' + wait + ' s';
+    } else if (!track.stop) {
+      send.disabled = true;
+      send.textContent = 'Choose a stop';
+    } else if (!track.route) {
+      send.disabled = true;
+      send.textContent = 'Choose the bus';
+    } else {
+      send.disabled = false;
+      send.textContent = 'Report Route ' + track.route + ' at ' + stopById(track.stop).name;
+    }
+  }
+
+  function sendReport() {
+    if (!track.stop || !track.route) return;
+    var stop = track.stop, route = track.route;
+    var status = $('report-status');
+    $('report-send').disabled = true;
+    status.textContent = 'Sending…';
+
+    fetch(SIGHTINGS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Device': deviceId() },
+      body: JSON.stringify({ stop: stop, route: route })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        return { status: r.status, body: body };
+      });
+    }).then(function (res) {
+      if (res.status === 201) {
+        status.textContent = 'Shared. Thank you — that helps everyone waiting.';
+        track.cooldownUntil = Date.now() + TRACK.cooldownSeconds * 1000;
+        track.stop = null;
+        track.route = null;
+        tickCooldown();
+        return fetchSightings();
+      }
+      if (res.status === 429) {
+        status.textContent = res.body.error === 'too-many'
+          ? 'Lots of reports from this network just now. Try again in a few minutes.'
+          : 'You just reported. Try again in a moment.';
+        track.cooldownUntil = Date.now() + (res.body.retryAfter || TRACK.cooldownSeconds) * 1000;
+        tickCooldown();
+      } else if (res.status === 404 || res.status === 503) {
+        track.status = 'off';
+        status.textContent = 'Tracking is not switched on yet.';
+      } else {
+        status.textContent = 'That did not go through. Try again.';
+      }
+      renderReport();
+    }).catch(function () {
+      status.textContent = 'No connection. Try again when you have signal.';
+      renderReport();
+    });
+  }
+
+  function tickCooldown() {
+    renderReport();
+    if (Date.now() < track.cooldownUntil) setTimeout(tickCooldown, 1000);
+  }
+
+  function renderSightings() {
+    var list = $('sightings-list');
+    var note = $('sightings-note');
+    list.innerHTML = '';
+
+    if (track.status === 'off') {
+      note.textContent = 'Tracking is not switched on for this copy of the app yet.';
+      return;
+    }
+    if (track.status === 'error') {
+      note.textContent = 'Could not load reports. Check your connection.';
+      return;
+    }
+    if (track.status === 'unknown') {
+      note.textContent = 'Loading…';
+      return;
+    }
+
+    // Several riders reporting the same bus at the same stop within a few
+    // minutes are one sighting, confirmed — not several buses.
+    var groups = [];
+    track.list.forEach(function (sg) {
+      var g = groups.filter(function (x) {
+        return x.route === sg.route && x.stop === sg.stop &&
+               Math.abs(x.t - sg.t) <= TRACK.confirmWindowMinutes * 60000;
+      })[0];
+      if (g) g.count++;
+      else groups.push({ route: sg.route, stop: sg.stop, t: sg.t, count: 1 });
+    });
+
+    groups.forEach(function (g) {
+      var route = routeById(g.route), stop = stopById(g.stop);
+      if (!route || !stop) return;
+      var li = el('li', 'sightings__item');
+      li.appendChild(routeBadge(route));
+      var text = el('span', 'sightings__text');
+      text.appendChild(el('span', 'sightings__stop', stop.name));
+      text.appendChild(el('span', 'sightings__sub',
+        agoText(minutesAgo(g.t)) + (g.count > 1 ? ' · ' + g.count + ' riders' : '')));
+      li.appendChild(text);
+      list.appendChild(li);
+    });
+
+    note.textContent = groups.length ? ''
+      : 'No reports in the last ' + TRACK.showMinutes + ' minutes. Be the first.';
+  }
+
+  function openTrack() {
+    renderReport();
+    renderSightings();
+    fetchSightings();
+
+    // A fresh position makes "closest stops" right. Only asked for here,
+    // where you came to report where you are.
+    if (!trackReference() && navigator.geolocation) {
+      try {
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          liveState().fix = { lat: pos.coords.latitude, lng: pos.coords.longitude,
+                              accuracy: pos.coords.accuracy || 0 };
+          if (currentPage === PAGE_TRACK) renderReport();
+        }, function () {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+      } catch (e) { /* alphabetical list still works */ }
+    }
+  }
+
+  function wireTrack() {
+    $('report-more').addEventListener('click', function () {
+      track.showAllStops = true;
+      renderReport();
+    });
+    $('report-send').addEventListener('click', sendReport);
+
+    fetchSightings();
+    // Reports age by the minute. Refresh often while looking at them, rarely
+    // otherwise, never while the app is hidden.
+    setInterval(function () {
+      if (document.hidden) return;
+      if (currentPage === PAGE_TRACK) fetchSightings();
+    }, 20000);
+    setInterval(function () {
+      if (document.hidden || currentPage === PAGE_TRACK) return;
+      fetchSightings();
+    }, 60000);
   }
 
   // =========================================================================
@@ -2021,6 +2373,7 @@
 
     wireNetwork();
     wireFood();
+    wireTrack();
     wirePager();
     render();
 

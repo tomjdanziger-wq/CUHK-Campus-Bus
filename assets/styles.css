@@ -979,6 +979,106 @@ li + li > .results__map { border-top: 1px solid var(--line); }
 .lastbus__none--gone { color: var(--danger); }
 .lastbus__other { margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink-3); }
 
+/* --- track --------------------------------------------------------------- */
+
+.report, .sightings {
+  padding: 14px 16px;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-1);
+}
+.sightings { margin-top: 14px; }
+.report__title, .sightings__title { margin: 0; font-size: 18px; font-weight: 600; }
+.report__lede { margin: 2px 0 0; font-size: 14px; color: var(--ink-3); }
+.report__step { margin: 14px 0 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+
+.report__stops { display: flex; flex-direction: column; }
+.report__stop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--tap);
+  padding: 6px 12px;
+  margin: 0 -12px;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.report__stop + .report__stop { box-shadow: inset 0 1px 0 var(--line); }
+.report__stop:hover { background: var(--surface-2); }
+.report__stop[aria-pressed="true"] {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  box-shadow: none;
+  font-weight: 600;
+}
+.report__stop[aria-pressed="true"] + .report__stop { box-shadow: none; }
+.report__stopname { flex: 1; min-width: 0; }
+.report__stopdist { flex-shrink: 0; font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+.report__more {
+  min-height: 36px;
+  margin: 4px 0 0 -12px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent-ink);
+  background: none;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.report__more[hidden] { display: none; }
+
+.report__send {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 16px;
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+  background: #1a73e8;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.report__send:disabled { color: var(--ink-3); background: var(--surface-2); cursor: default; }
+.report__status { margin: 8px 0 0; font-size: 14px; color: var(--ink-2); }
+.report__status:empty { display: none; }
+
+.sightings__list { list-style: none; margin: 8px 0 0; padding: 0; }
+.sightings__list:empty { display: none; }
+.sightings__item { display: flex; align-items: flex-start; gap: 12px; padding: 7px 0; }
+.sightings__item + .sightings__item { border-top: 1px solid var(--line); }
+.sightings__item .badge { margin-top: 1px; }
+.sightings__text { flex: 1; min-width: 0; }
+.sightings__stop { display: block; font-size: 15px; }
+.sightings__sub { display: block; font-size: 13px; color: var(--ink-3); }
+.sightings__note { margin: 8px 0 0; font-size: 14px; color: var(--ink-3); }
+.sightings__note:empty { display: none; }
+.track__privacy { margin: 16px 4px 0; font-size: 13px; line-height: 1.5; color: var(--ink-3); }
+
+/* A rider report on a trip card: useful, but never mistaken for the timetable. */
+.seenline {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.seenline .icon { margin-top: 2px; color: var(--walk); }
+.seenline strong { font-weight: 600; color: var(--walk); }
+
 /* --- footer ------------------------------------------------------------- */
 
 .footer {

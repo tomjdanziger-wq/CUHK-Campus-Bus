@@ -1863,6 +1863,7 @@
           return;
         }
         track.stop = st.id;
+        track.pass = null;
         var serving = DATA.routes.filter(function (r) {
           return r.stops.indexOf(st.id) !== -1 && planner.runsToday(r, new Date());
         });
@@ -1894,9 +1895,30 @@
           c.appendChild(el('span', 'chip__dot'));
           c.appendChild(el('span', null, r.id));
           c.title = r.name + (r.label ? ' · ' + r.label : '');
-          c.addEventListener('click', function () { track.route = r.id; renderReport(); });
+          c.addEventListener('click', function () { track.route = r.id; track.pass = null; renderReport(); });
           chips.appendChild(c);
         });
+    }
+
+    // A route that passes this stop twice: which pass? Ask by where it goes
+    // next, with the timetable's guess selected.
+    var passBox = $('report-pass-box');
+    var passChips = $('report-pass');
+    passChips.innerHTML = '';
+    var chosenRoute = track.route && routeById(track.route);
+    var passes = chosenRoute ? stopPasses(chosenRoute, track.stop) : [];
+    passBox.hidden = passes.length < 2;
+    if (passes.length >= 2) {
+      if (passes.indexOf(track.pass) === -1) track.pass = stopPosition(chosenRoute, track.stop, Date.now());
+      passes.forEach(function (i) {
+        var next = stopById(chosenRoute.stops[i + 1]);
+        var c = el('button', 'chip');
+        c.type = 'button';
+        c.setAttribute('aria-pressed', String(track.pass === i));
+        c.textContent = 'Next: ' + (next ? next.name : 'end of route');
+        c.addEventListener('click', function () { track.pass = i; renderReport(); });
+        passChips.appendChild(c);
+      });
     }
 
     var send = $('report-send');
@@ -1917,6 +1939,43 @@
       send.disabled = false;
       send.textContent = 'Report Route ' + track.route + ' at ' + stopById(track.stop).name;
     }
+  }
+
+  /**
+   * Which pass of the route this is, for a stop the route calls at twice.
+   * The Night and Holiday buses pass University Station, Postgraduate Hall 1
+   * and United College twice; taking the first pass every time made a rider
+   * who boarded on the second pass look as if they were half a route behind.
+   * Pick the pass whose timetabled time is nearest to now.
+   */
+  function stopPosition(route, stopId, when) {
+    var passes = stopPasses(route, stopId);
+    if (passes.length <= 1) return passes.length ? passes[0] : route.stops.indexOf(stopId);
+    var first = passes[0];
+
+    var date = new Date(when);
+    var minutes = date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
+    var byId = {};
+    DATA.stops.forEach(function (st) { byId[st.id] = st; });
+    var best = first, bestGap = Infinity;
+    passes.forEach(function (i) {
+      var deps = planner.departuresFrom(route, i, minutes - 30, byId, CFG, date);
+      deps.forEach(function (m) {
+        var gap = Math.abs(m - minutes);
+        if (gap < bestGap) { bestGap = gap; best = i; }
+      });
+    });
+    return best;
+  }
+
+  /** Positions on the route where a bus can be at this stop with somewhere
+   *  still to go. The last stop is not one: nobody rides on from the end. */
+  function stopPasses(route, stopId) {
+    var out = [];
+    route.stops.forEach(function (id, i) {
+      if (id === stopId && i < route.stops.length - 1) out.push(i);
+    });
+    return out;
   }
 
   /** A random id for one ride. Nothing links it to the phone or person. */
@@ -1993,7 +2052,9 @@
   function sendReport() {
     if (!track.stop || !track.route) return;
     var stop = track.stop, route = routeById(track.route);
-    var i = route.stops.indexOf(stop);
+    var passes = stopPasses(route, stop);
+    var i = passes.length > 1 && passes.indexOf(track.pass) !== -1 ? track.pass
+          : stopPosition(route, stop, Date.now());
     var trip = newTripId();
     var status = $('report-status');
     $('report-send').disabled = true;
@@ -2770,7 +2831,7 @@
       // A fixed document id, chosen now: if a send is retried after the app
       // was closed mid-way, the same report cannot be stored twice.
       key: newTripId() + newTripId().slice(0, 4),
-      route: route.id, stop: stop.id, i: route.stops.indexOf(stop.id),
+      route: route.id, stop: stop.id, i: stopPosition(route, stop.id, now),
       at: now,                        // when the bus was there — never changed
       sendAfter: now + SPOT_UNDO_MS,  // when it may go out
       session: spot.session,

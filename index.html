@@ -93,6 +93,12 @@
         <div id="report-routes" class="chips" role="group" aria-labelledby="report-route-label"></div>
       </div>
 
+      <!-- Only for a stop the chosen route passes twice. -->
+      <div id="report-pass-box" hidden>
+        <p class="report__step" id="report-pass-label">Where does it go next?</p>
+        <div id="report-pass" class="chips" role="group" aria-labelledby="report-pass-label"></div>
+      </div>
+
       <button id="report-send" class="report__send" type="button" disabled>Choose a stop</button>
       <p id="report-status" class="report__status" role="status"></p>
     </section>

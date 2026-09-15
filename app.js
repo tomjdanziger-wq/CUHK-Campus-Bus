@@ -2940,10 +2940,17 @@
     // arriving together no longer wait for each other.
     var session = spot.queue[0].session;
     var now = Date.now();
-    var due = spot.queue.filter(function (e) {
-      return e.session === session && e.sendAfter <= now;
-    }).slice(0, 10);
-    var wait = Math.max(spot.queue[0].sendAfter, spot.nextAllowed) - now;
+    var mine = spot.queue.filter(function (e) { return e.session === session; });
+
+    // Taps close together travel together: if another will be ready within
+    // the cooldown anyway, wait for it rather than send the first alone and
+    // make the second sit out the cooldown.
+    var sendAt = Math.max(mine[0].sendAfter, spot.nextAllowed);
+    mine.forEach(function (e) {
+      if (e.sendAfter > sendAt && e.sendAfter - sendAt <= TRACK.rideTapSeconds * 1000) sendAt = e.sendAfter;
+    });
+    var due = mine.filter(function (e) { return e.sendAfter <= sendAt; }).slice(0, 10);
+    var wait = sendAt - now;
     if (!due.length || wait > 0) {
       spot.timer = setTimeout(pumpSpots, Math.max(wait, 250) + 50);
       renderSpotLog();

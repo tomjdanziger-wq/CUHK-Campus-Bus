@@ -609,6 +609,16 @@ the app is in the background to save battery. The start marker on the trip map
 is a hollow ring, like the start dot in the search box, so the solid dot always
 means "you, now".
 
+## Spotting buses from a stop
+
+The **Spot** page (the first tab) is for filling the database quickly without riding: walking across campus, you log every bus you see pull in at a stop.
+
+- **The stop follows you.** GPS picks the nearest stop within 90 m as you walk; the four nearest are chips for a one-tap correction (usually to the other side of the road), and a stop picked by hand sticks until you are 150 m away from it.
+- **One tap per bus.** Big buttons in each route's colour, only for routes that call at that stop and run today. No confirm step; a double tap within 3 s counts once.
+- **Five seconds to undo.** Reports cannot be deleted once stored, so a tap waits five seconds with an *Undo* before it goes out. After that, taps send one by one, 10 seconds apart (the rules' cooldown), each carrying the time you tapped, so a queue of three buses still records three accurate arrival times. Leaving the app sends whatever is waiting.
+
+Spots go to their own `spots` collection, never mixed with ride logs: a Route 4 spotted at one stop and another Route 4 spotted at the next are two buses, not a timed hop. They do appear on the Track page and on trip cards ("seen from the stop"), and `scripts/export-reports.js` writes them to `exports/spots.csv` — each row an arrival at a stop, which is what punctuality modelling needs.
+
 ## Rider tracking
 
 The **Track** page (swipe all the way right from the planner, or the first tab) lets someone who has just boarded report it in two taps: the stop — nearest first when the phone knows where it is — and then the route number, from only the routes that call there and run today.

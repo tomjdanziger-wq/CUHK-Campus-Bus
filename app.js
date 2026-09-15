@@ -1586,7 +1586,7 @@
   // coming back finds it where you left it.
   // =========================================================================
 
-  var PAGE_TRACK = 0, PAGE_ROUTES = 1, PAGE_TRIP = 2, PAGE_FOOD = 3;
+  var PAGE_SPOT = 0, PAGE_TRACK = 1, PAGE_ROUTES = 2, PAGE_TRIP = 3, PAGE_FOOD = 4;
   var currentPage = PAGE_TRIP;
 
   function goToPage(index, instant) {
@@ -1610,6 +1610,7 @@
     // Re-sorted every visit, because "nearest" depends on the current start.
     if (index === PAGE_FOOD) renderFood();
     if (index === PAGE_TRACK) openTrack();
+    if (index === PAGE_SPOT) openSpot(); else closeSpot();
   }
 
   function wirePager() {
@@ -1754,7 +1755,8 @@
     showAllStops: false,
     cooldownUntil: 0,
     ready: null,           // Promise of Firestore
-    unsubscribe: null,
+    unsubscribe: null,     // stops both listeners
+    lists: { sightings: null, spots: null },
     subscribedAt: 0
   };
 
@@ -1816,48 +1818,77 @@
    * are sent and billed, so this is cheaper than polling as well as quicker.
    * The window is fixed when the listener starts, so it is renewed regularly.
    */
+  /**
+   * Keep live listeners on the last `showMinutes` of reports: rides
+   * (sightings) and buses spotted from the kerb (spots). Only changes are
+   * sent and billed, so this is cheaper than polling as well as quicker. The
+   * window is fixed when a listener starts, so it is renewed regularly.
+   */
   function fetchSightings() {
     return firebaseReady().then(function (db) {
       if (track.unsubscribe && Date.now() - track.subscribedAt < 10 * 60000) return;
-      if (track.unsubscribe) track.unsubscribe();
+      stopListening();
 
       var since = window.firebase.firestore.Timestamp.fromMillis(Date.now() - TRACK.showMinutes * 60000);
       track.subscribedAt = Date.now();
-      track.unsubscribe = db.collection('sightings')
-        .where('t', '>=', since)
-        .orderBy('t', 'desc')
-        .limit(200)
-        .onSnapshot({ includeMetadataChanges: true }, function (snap) {
-          // Firestore answers from its local cache first and quietly waits
-          // for the server. An empty cache is not "no reports", so say
-          // "connecting" until the server has actually replied.
-          if (snap.metadata.fromCache && track.status !== 'ok') {
-            track.status = 'connecting';
+      track.lists = { sightings: null, spots: null };
+
+      var offs = ['sightings', 'spots'].map(function (name) {
+        return db.collection(name)
+          .where('t', '>=', since)
+          .orderBy('t', 'desc')
+          .limit(200)
+          .onSnapshot({ includeMetadataChanges: true }, function (snap) {
+            // Firestore answers from its local cache first and quietly waits
+            // for the server. An empty cache is not "no reports", so say
+            // "connecting" until the server has actually replied.
+            if (snap.metadata.fromCache && track.status !== 'ok') {
+              track.status = 'connecting';
+              sightingsChanged();
+              return;
+            }
+            track.lists[name] = snap.docs.map(function (d) {
+              var v = d.data({ serverTimestamps: 'estimate' });
+              return {
+                id: d.id, stop: v.stop, route: v.route, i: v.i,
+                // A spotter's session id is not a ride: every spot stands
+                // on its own in the list.
+                trip: name === 'spots' ? null : v.trip,
+                spot: name === 'spots',
+                t: toMillis(v.at || v.t)
+              };
+            });
+            mergeLists();
+          }, function (err) {
+            if (window.console) console.warn(name + ' listener:', err);
+            track.status = 'error';
+            stopListening();
             sightingsChanged();
-            return;
-          }
-          track.status = 'ok';
-          track.list = snap.docs.map(function (d) {
-            var v = d.data({ serverTimestamps: 'estimate' });
-            return { id: d.id, stop: v.stop, route: v.route, i: v.i, trip: v.trip, t: toMillis(v.t) };
-          }).filter(function (sg) {
-            return Date.now() - sg.t <= TRACK.showMinutes * 60000;
           });
-          sightingsChanged();
-        }, function (err) {
-          if (window.console) console.warn('Sightings listener:', err);
-          track.status = 'error';
-          track.unsubscribe = null;
-          sightingsChanged();
-        });
+      });
+      track.unsubscribe = function () { offs.forEach(function (off) { off(); }); };
     }).catch(function (err) {
       track.status = err && err.message === 'off' ? 'off' : 'error';
       sightingsChanged();
     });
   }
 
+  function stopListening() {
+    if (track.unsubscribe) track.unsubscribe();
+    track.unsubscribe = null;
+  }
+
+  function mergeLists() {
+    track.status = 'ok';
+    track.list = (track.lists.sightings || []).concat(track.lists.spots || [])
+      .filter(function (sg) { return Date.now() - sg.t <= TRACK.showMinutes * 60000; })
+      .sort(function (a, b) { return b.t - a.t; });
+    sightingsChanged();
+  }
+
   function sightingsChanged() {
     if (currentPage === PAGE_TRACK) { renderSightings(); if (!track.ride) renderReport(); }
+    if (currentPage === PAGE_SPOT) renderSpotLog();
     if (state.origin && state.destination) render();
   }
 
@@ -2575,9 +2606,9 @@
         return x.route === sg.route && x.stop === sg.stop &&
                Math.abs(x.t - sg.t) <= TRACK.confirmWindowMinutes * 60000;
       })[0];
-      var onBoard = sg.trip && tripSize[sg.trip] > 1;
-      if (g) { g.count++; g.onBoard = g.onBoard || onBoard; }
-      else groups.push({ route: sg.route, stop: sg.stop, t: sg.t, count: 1, onBoard: onBoard });
+      var onBoard = !!(sg.trip && tripSize[sg.trip] > 1);
+      if (g) { g.count++; g.onBoard = g.onBoard || onBoard; g.spotted = g.spotted && sg.spot; }
+      else groups.push({ route: sg.route, stop: sg.stop, t: sg.t, count: 1, onBoard: onBoard, spotted: !!sg.spot });
     });
 
     groups.forEach(function (g) {
@@ -2589,7 +2620,8 @@
       text.appendChild(el('span', 'sightings__stop', stop.name));
       text.appendChild(el('span', 'sightings__sub',
         agoText(minutesAgo(g.t)) + (g.count > 1 ? ' · ' + g.count + ' riders' : '') +
-        (g.onBoard ? ' · rider on board, logging stops' : '')));
+        (g.onBoard ? ' · rider on board, logging stops' : '') +
+        (g.spotted ? ' · seen from the stop' : '')));
       li.appendChild(text);
       list.appendChild(li);
     });
@@ -2659,10 +2691,284 @@
     // No listening while the app is in the background.
     document.addEventListener('visibilitychange', function () {
       if (document.hidden && track.unsubscribe) {
-        track.unsubscribe();
-        track.unsubscribe = null;
+        stopListening();
       } else if (!document.hidden) {
         fetchSightings();
+      }
+    });
+  }
+
+  // =========================================================================
+  // Spot: buses seen from the kerb
+  //
+  // Walking across campus you pass stops, and buses pull in. Each one tapped
+  // is an arrival time at a known stop — the raw material for punctuality —
+  // without anyone having to ride. So this is built for speed: the stop is
+  // picked from GPS as you walk, one tap per bus, no confirm step. Taps wait
+  // five seconds before sending so a wrong one can be undone (reports cannot
+  // be deleted once stored), then go out one by one within the cooldown.
+  //
+  // Spots are their own collection. They share nothing with ride logs, so a
+  // bus spotted at one stop and the same route spotted at the next can never
+  // be mistaken for someone riding between them.
+  // =========================================================================
+
+  var SPOT_UNDO_MS = 5000;
+
+  var spot = {
+    stop: null,            // chosen stop id
+    manual: false,         // chosen by hand (GPS will not override nearby)
+    showAll: false,
+    watchId: null,
+    fix: null,
+    session: null,         // random id for this phone's spotting session
+    log: [],               // newest first: { key, route, stop, i, at, state }
+    queue: [],
+    nextAllowed: 0,
+    sending: false,
+    timer: null
+  };
+
+  function openSpot() {
+    if (!spot.session) spot.session = newTripId();
+    firebaseReady().catch(function () {});        // sign in early
+    fetchSightings();
+    startSpotWatch();
+    renderSpot();
+  }
+
+  function closeSpot() {
+    if (spot.watchId !== null && navigator.geolocation) {
+      try { navigator.geolocation.clearWatch(spot.watchId); } catch (e) {}
+    }
+    spot.watchId = null;
+  }
+
+  function startSpotWatch() {
+    if (spot.watchId !== null || !navigator.geolocation) return;
+    try {
+      spot.watchId = navigator.geolocation.watchPosition(function (pos) {
+        spot.fix = { lat: pos.coords.latitude, lng: pos.coords.longitude,
+                     accuracy: pos.coords.accuracy || 999 };
+        liveState().fix = spot.fix;
+        autoPickStop();
+        if (currentPage === PAGE_SPOT) renderSpot();
+      }, function () {
+        spot.fix = null;
+        if (currentPage === PAGE_SPOT) renderSpot();
+      }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+    } catch (e) { /* the stop list still works */ }
+  }
+
+  function stopsByDistance(fix) {
+    return DATA.stops.map(function (st) {
+      return { stop: st, d: geo.haversineMetres(fix, st) };
+    }).sort(function (a, b) { return a.d - b.d; });
+  }
+
+  /** Follow the nearest stop while walking — unless one was picked by hand
+   *  and you are still near it. */
+  function autoPickStop() {
+    if (!spot.fix || spot.fix.accuracy > 80) return;
+    var near = stopsByDistance(spot.fix)[0];
+    if (spot.manual) {
+      var chosen = stopById(spot.stop);
+      if (chosen && geo.haversineMetres(spot.fix, chosen) < 150) return;
+      spot.manual = false;
+    }
+    spot.stop = near && near.d <= 90 ? near.stop.id : null;
+  }
+
+  function pickSpotStop(id) {
+    spot.stop = id;
+    spot.manual = true;
+    spot.showAll = false;
+    renderSpot();
+  }
+
+  function renderSpot() {
+    var where = $('spot-where');
+    var chosen = stopById(spot.stop);
+    var near = spot.fix ? stopsByDistance(spot.fix) : null;
+
+    if (chosen) {
+      var d = spot.fix ? Math.round(geo.haversineMetres(spot.fix, chosen) / 5) * 5 : null;
+      where.textContent = 'At ' + chosen.name + (d !== null && !spot.manual ? ' · ' + d + ' m' : '');
+    } else {
+      where.textContent = near ? 'Not at a stop — pick one:' : 'Which stop are you at?';
+    }
+
+    // The closest few as chips, for a one-tap correction (the other side of
+    // the road is usually the one GPS got wrong).
+    var chips = $('spot-stops');
+    chips.innerHTML = '';
+    var options = near ? near.slice(0, 4).map(function (n) { return n.stop; }) : [];
+    if (chosen && options.indexOf(chosen) === -1) options.unshift(chosen);
+    options.forEach(function (st) {
+      var c = el('button', 'chip');
+      c.type = 'button';
+      c.setAttribute('aria-pressed', String(st.id === spot.stop));
+      c.textContent = st.name;
+      c.addEventListener('click', function () { pickSpotStop(st.id); });
+      chips.appendChild(c);
+    });
+    chips.hidden = !options.length;
+
+    $('spot-all').textContent = spot.showAll ? 'Hide the list' : (options.length ? 'Other stop' : 'Choose from all stops');
+    var list = $('spot-list');
+    list.hidden = !spot.showAll;
+    list.innerHTML = '';
+    if (spot.showAll) {
+      DATA.stops.slice().sort(function (a, b) { return a.name.localeCompare(b.name); })
+        .forEach(function (st) {
+          var b = el('button', 'report__stop');
+          b.type = 'button';
+          b.setAttribute('aria-pressed', String(st.id === spot.stop));
+          b.appendChild(el('span', 'report__stopname', st.name));
+          b.addEventListener('click', function () { pickSpotStop(st.id); });
+          list.appendChild(b);
+        });
+    }
+
+    // One big button per bus that calls here today.
+    var box = $('spot-routes');
+    box.innerHTML = '';
+    if (chosen) {
+      var serving = DATA.routes.filter(function (r) { return r.stops.indexOf(chosen.id) !== -1; });
+      var today = serving.filter(function (r) { return planner.runsToday(r, new Date()); });
+      (today.length ? today : serving).forEach(function (r) {
+        var b = el('button', 'spot__bus');
+        b.type = 'button';
+        b.style.setProperty('--route-colour', r.colour);
+        b.appendChild(el('span', 'spot__busid', r.id));
+        b.appendChild(el('span', 'spot__busname', r.label || r.name));
+        b.setAttribute('aria-label', 'Spotted Route ' + r.id + ' at ' + chosen.name);
+        b.addEventListener('click', function () { spotBus(r, chosen); });
+        box.appendChild(b);
+      });
+    }
+
+    if (track.status === 'off') $('spot-status').textContent = 'Tracking is not switched on yet.';
+    renderSpotLog();
+  }
+
+  function spotBus(route, stop) {
+    var now = Date.now();
+    // A double tap is not two buses.
+    var last = spot.log[0];
+    if (last && last.route === route.id && last.stop === stop.id && now - last.at < 3000) return;
+
+    var entry = { key: now + ':' + route.id, route: route.id, stop: stop.id,
+                  i: route.stops.indexOf(stop.id), at: now, state: 'waiting' };
+    spot.log.unshift(entry);
+    spot.queue.push(entry);
+    if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+    renderSpotLog();
+    pumpSpots();
+  }
+
+  function undoSpot(entry) {
+    if (entry.state !== 'waiting') return;
+    spot.queue = spot.queue.filter(function (e) { return e !== entry; });
+    spot.log = spot.log.filter(function (e) { return e !== entry; });
+    renderSpotLog();
+  }
+
+  function pumpSpots() {
+    clearTimeout(spot.timer);
+    if (spot.sending || !spot.queue.length) return;
+    var e = spot.queue[0];
+    var wait = Math.max(e.at + SPOT_UNDO_MS, spot.nextAllowed) - Date.now();
+    if (wait > 0) {
+      spot.timer = setTimeout(pumpSpots, wait + 50);
+      renderSpotLog();
+      return;
+    }
+
+    spot.sending = true;
+    e.state = 'sending';
+    renderSpotLog();
+    postRideEvent('spots', e.route, e.i, e.stop, spot.session, { at: e.at })
+      .then(sent, function (err) {
+        if (err && err.code === 'slow') return sent();       // queued by Firestore
+        spot.sending = false;
+        if (err && err.code === 'off') {
+          e.state = 'failed';
+          spot.queue.shift();
+          $('spot-status').textContent = describeFailure(err);
+        } else {
+          // The cooldown (a ride report just before), or no signal: retry.
+          e.state = 'waiting';
+          e.attempts = (e.attempts || 0) + 1;
+          spot.nextAllowed = Date.now() + (err && err.code === 'permission-denied' ? 11000 : 15000);
+          if (e.attempts > 8) { e.state = 'failed'; spot.queue.shift(); }
+        }
+        renderSpotLog();
+        pumpSpots();
+      });
+
+    function sent() {
+      spot.sending = false;
+      e.state = 'sent';
+      spot.queue.shift();
+      spot.nextAllowed = Date.now() + TRACK.rideTapSeconds * 1000 + 500;
+      $('spot-status').textContent = '';
+      renderSpotLog();
+      pumpSpots();
+    }
+  }
+
+  function renderSpotLog() {
+    var list = $('spot-log');
+    if (!list) return;
+    list.innerHTML = '';
+    var now = Date.now();
+    spot.log.slice(0, 30).forEach(function (e) {
+      var route = routeById(e.route), stop = stopById(e.stop);
+      if (!route || !stop) return;
+      var li = el('li', 'sightings__item');
+      li.appendChild(routeBadge(route));
+      var text = el('span', 'sightings__text');
+      text.appendChild(el('span', 'sightings__stop', stop.name));
+      var left = Math.ceil((e.at + SPOT_UNDO_MS - now) / 1000);
+      text.appendChild(el('span', 'sightings__sub', clock(e.at).slice(0, 5) + ' · ' + (
+        e.state === 'sent' ? 'sent' :
+        e.state === 'sending' ? 'sending…' :
+        e.state === 'failed' ? 'not sent' :
+        left > 0 ? 'sends in ' + left + ' s' : 'waiting to send')));
+      li.appendChild(text);
+      if (e.state === 'waiting' && left > 0) {
+        var undo = el('button', 'report__more spot__undo', 'Undo');
+        undo.type = 'button';
+        undo.addEventListener('click', function () { undoSpot(e); });
+        li.appendChild(undo);
+      }
+      list.appendChild(li);
+    });
+    $('spot-log-note').textContent = spot.log.length ? '' :
+      'Nothing yet. Every bus you tap helps work out how punctual the routes are.';
+
+    // Keep the countdown moving while anything is still undoable.
+    if (spot.log.some(function (e) { return e.state === 'waiting' && e.at + SPOT_UNDO_MS > now; })) {
+      clearTimeout(spot.tick);
+      spot.tick = setTimeout(renderSpotLog, 1000);
+    }
+  }
+
+  function wireSpot() {
+    $('spot-all').addEventListener('click', function () {
+      spot.showAll = !spot.showAll;
+      renderSpot();
+    });
+    // Anything still waiting goes out if the app is closed — better a wrong
+    // tap than a lost bus. (Firestore sends what it can.)
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        closeSpot();
+        spot.queue.forEach(function (e) { e.at = Math.min(e.at, Date.now() - SPOT_UNDO_MS); });
+        pumpSpots();
+      } else if (currentPage === PAGE_SPOT) {
+        startSpotWatch();
       }
     });
   }
@@ -2981,6 +3287,7 @@
     wireNetwork();
     wireFood();
     wireTrack();
+    wireSpot();
     wirePager();
     render();
 

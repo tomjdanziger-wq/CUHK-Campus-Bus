@@ -24,6 +24,31 @@
   <!-- Track: riders report the bus they just got on, so everyone gets   -->
   <!-- a better picture than the timetable alone. No account needed.     -->
   <!-- ---------------------------------------------------------------- -->
+  <!-- ---------------------------------------------------------------- -->
+  <!-- Spot: walking past a stop, log the buses you see there. No need   -->
+  <!-- to get on — every sighting is an arrival time for the model.      -->
+  <!-- ---------------------------------------------------------------- -->
+  <section id="page-spot" class="page" role="tabpanel" aria-labelledby="tab-spot">
+    <section class="report spot" aria-labelledby="spot-title">
+      <h2 id="spot-title" class="report__title">Buses you see</h2>
+      <p class="report__lede">At a stop? Tap each bus as it pulls in. You don't need to get on.</p>
+
+      <p class="report__step" id="spot-where"></p>
+      <div id="spot-stops" class="chips spot__stops" role="group" aria-labelledby="spot-where"></div>
+      <button id="spot-all" class="report__more" type="button">All stops</button>
+      <div id="spot-list" class="report__stops" hidden></div>
+
+      <div id="spot-routes" class="spot__routes" role="group" aria-label="Which bus"></div>
+      <p id="spot-status" class="report__status" role="status"></p>
+    </section>
+
+    <section class="sightings" aria-labelledby="spot-log-title">
+      <h2 id="spot-log-title" class="sightings__title">You spotted</h2>
+      <ul id="spot-log" class="sightings__list"></ul>
+      <p id="spot-log-note" class="sightings__note">Nothing yet.</p>
+    </section>
+  </section>
+
   <section id="page-track" class="page" role="tabpanel" aria-labelledby="tab-track">
     <!-- While on a bus: tap at each stop. Measures how long the route really
          takes, and shows everyone where that bus is. -->
@@ -201,22 +226,27 @@
 <!-- Bottom navigation, where a thumb can reach it. Swiping between the pages
      does the same thing; the bar says where you are. -->
 <nav class="tabs" role="tablist" aria-label="Sections">
-  <button id="tab-track" class="tabs__tab" type="button" role="tab" data-page="0"
+  <button id="tab-spot" class="tabs__tab" type="button" role="tab" data-page="0"
+          aria-controls="page-spot" aria-selected="false">
+    <span class="tabs__icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg></span>
+    <span class="tabs__label">Spot</span>
+  </button>
+  <button id="tab-track" class="tabs__tab" type="button" role="tab" data-page="1"
           aria-controls="page-track" aria-selected="false">
     <span class="tabs__icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.76 16.24C6.67 15.16 6 13.66 6 12s.67-3.16 1.76-4.24l1.42 1.42C8.45 9.9 8 10.9 8 12c0 1.1.45 2.1 1.17 2.83l-1.41 1.41zm8.48 0C17.33 15.16 18 13.66 18 12s-.67-3.16-1.76-4.24l-1.42 1.42C15.55 9.9 16 10.9 16 12c0 1.1-.45 2.1-1.17 2.83l1.41 1.41zM12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm8 2c0 2.21-.9 4.21-2.35 5.65l1.42 1.42C20.88 17.26 22 14.76 22 12s-1.12-5.26-2.93-7.07l-1.42 1.42C19.1 7.79 20 9.79 20 12zM6.35 6.35L4.93 4.93C3.12 6.74 2 9.24 2 12s1.12 5.26 2.93 7.07l1.42-1.42C4.9 16.21 4 14.21 4 12s.9-4.21 2.35-5.65z"/></svg></span>
     <span class="tabs__label">Track</span>
   </button>
-  <button id="tab-routes" class="tabs__tab" type="button" role="tab" data-page="1"
+  <button id="tab-routes" class="tabs__tab" type="button" role="tab" data-page="2"
           aria-controls="page-routes" aria-selected="false">
     <span class="tabs__icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg></span>
     <span class="tabs__label">Routes</span>
   </button>
-  <button id="tab-trip" class="tabs__tab" type="button" role="tab" data-page="2"
+  <button id="tab-trip" class="tabs__tab" type="button" role="tab" data-page="3"
           aria-controls="page-trip" aria-selected="true">
     <span class="tabs__icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21.71 11.29l-9-9a1 1 0 0 0-1.42 0l-9 9a1 1 0 0 0 0 1.42l9 9a1 1 0 0 0 1.42 0l9-9a1 1 0 0 0 0-1.42zM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5-3.5 3.5z"/></svg></span>
     <span class="tabs__label">Go</span>
   </button>
-  <button id="tab-food" class="tabs__tab" type="button" role="tab" data-page="3"
+  <button id="tab-food" class="tabs__tab" type="button" role="tab" data-page="4"
           aria-controls="page-food" aria-selected="false">
     <span class="tabs__icon"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg></span>
     <span class="tabs__label">Food</span>

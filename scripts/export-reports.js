@@ -4,7 +4,7 @@
  *
  *     node scripts/export-reports.js
  *
- * Writes exports/sightings.csv and exports/alightings.csv. Reads through the
+ * Writes exports/sightings.csv, exports/alightings.csv and exports/spots.csv. Reads through the
  * public API with the same rules as the app, 200 documents at a time (the
  * most the rules allow per query), oldest first.
  *
@@ -15,6 +15,7 @@
  *   stop     stop id, e.g. wu-yee-sun-down
  *   i        the stop's position on the route (routes can pass a stop twice)
  *   trip     random ride id: rows with the same trip are one person's ride
+ *            (for spots, one spotting session — not a ride)
  *   auto     sightings: true if GPS logged the stop, empty if tapped
  *   how      alightings: gps (guess accepted), tap ("I got off"), picked
  */
@@ -90,6 +91,7 @@ async function exportCollection(collection, columns) {
 (async () => {
   await exportCollection('sightings', ['t', 'at', 'route', 'stop', 'i', 'trip', 'auto']);
   await exportCollection('alightings', ['t', 'at', 'route', 'stop', 'i', 'trip', 'how']);
+  await exportCollection('spots', ['t', 'at', 'route', 'stop', 'i', 'trip']);
 })().catch((err) => {
   console.error('Export failed:', err.message);
   process.exit(1);

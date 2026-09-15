@@ -1115,6 +1115,48 @@ li + li > .results__map { border-top: 1px solid var(--line); }
 #ride-off .report__send { margin-top: 12px; }
 .ride__queue:empty { display: none; }
 
+/* Spot */
+.spot__stops { margin: 0 0 4px; }
+.spot__stops .chip { white-space: normal; text-align: left; line-height: 1.25; }
+.spot__stops[hidden], #spot-list[hidden] { display: none; }
+.spot__routes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.spot__routes:empty { display: none; }
+.spot__bus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 76px;
+  padding: 8px 6px;
+  font: inherit;
+  color: #fff;
+  background: var(--route-colour, #5f6368);
+  border: none;
+  border-radius: 14px;
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.spot__bus:active { transform: scale(.96); filter: brightness(.92); }
+.spot__busid { font-size: 26px; font-weight: 700; line-height: 1; }
+.spot__busname {
+  max-width: 100%;
+  font-size: 11.5px;
+  line-height: 1.2;
+  text-align: center;
+  opacity: .92;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.spot__undo { margin: 0 -8px 0 0; align-self: center; }
+
 /* A rider report on a trip card: useful, but never mistaken for the timetable. */
 .seenline {
   display: flex;

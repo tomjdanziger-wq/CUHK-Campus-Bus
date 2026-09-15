@@ -111,6 +111,32 @@ ${map}
       allow update, delete: if false;
     }
 
+    // Buses seen from a stop by someone not riding them. The trip field is
+    // the spotter's session, used only for the cooldown between taps.
+    match /spots/{id} {
+      allow get: if true;
+      allow list: if request.query.limit <= 200;
+
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['stop', 'route', 'i', 'trip', 't', 'at', 'expireAt'])
+        && request.resource.data.stop is string
+        && request.resource.data.route is string
+        && request.resource.data.i is int
+        && stopOnRoute(request.resource.data.route, request.resource.data.i, request.resource.data.stop)
+        && request.resource.data.trip is string
+        && request.resource.data.trip.size() >= 8 && request.resource.data.trip.size() <= 32
+        && request.resource.data.t == request.time
+        && request.resource.data.at is timestamp
+        && request.resource.data.at <= request.time + duration.value(2, 'm')
+        && request.resource.data.at >= request.time - duration.value(60, 'm')
+        && request.resource.data.expireAt is timestamp
+        && request.resource.data.expireAt <= request.time + duration.value(${T.keepDays + 1}, 'd')
+        && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.t == request.time
+        && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.trip == request.resource.data.trip;
+
+      allow update, delete: if false;
+    }
+
     // One tiny document per phone: when it last reported.
     match /throttle/{uid} {
       allow read: if false;

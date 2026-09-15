@@ -18,4 +18,10 @@
     messagingSenderId: '670161824369',
     appId: '1:670161824369:web:2fb0eacaeb2628d822c9d0'
   };
+
+  // Firebase account ids (not emails) allowed to read ALL reports, for the
+  // private stats page. Everyone else — the app included — can only read the
+  // last few hours. Find yours by signing in on stats.html; after changing
+  // this, run `node scripts/build-firestore-rules.js` and publish the rules.
+  root.FIREBASE_ADMIN_UIDS = [];
 })(typeof globalThis !== 'undefined' ? globalThis : this);

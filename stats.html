@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#202124" media="(prefers-color-scheme: dark)">
+  <meta name="robots" content="noindex">
+  <title>Shuttle data · CUHK Shuttle Helper</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="assets/stats.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+</head>
+<body class="stats-page">
+
+<main class="stats">
+  <header class="stats__head">
+    <a class="stats__back" href="./">← Back to the app</a>
+    <h1 class="stats__title">What riders have logged</h1>
+    <p class="stats__lede">
+      Every bus reported, spotted from a stop, or logged stop by stop.
+      Rider data — useful, not official.
+    </p>
+  </header>
+
+  <!-- Private: nothing below loads until an admin account signs in. -->
+  <section id="gate" class="card gate">
+    <h2 class="card__title" id="gate-title">This page is private</h2>
+    <p class="card__sub" id="gate-text">Sign in with the Google account that runs the app.</p>
+    <button id="sign-in" class="report__send gate__btn" type="button">Sign in with Google</button>
+    <div id="gate-uid" class="gate__uid" hidden>
+      <p class="card__sub">Your account id — send it to whoever sets up the app to get access:</p>
+      <code id="uid-value"></code>
+      <button id="uid-copy" class="report__more" type="button">Copy</button>
+    </div>
+    <button id="sign-out" class="report__more" type="button" hidden>Sign out</button>
+  </section>
+
+  <div id="admin" hidden>
+  <!-- Filters scope everything below them. -->
+  <div class="stats__filters" role="group" aria-label="Time range">
+    <button class="chip" type="button" data-range="1" aria-pressed="false">Today</button>
+    <button class="chip" type="button" data-range="7" aria-pressed="true">7 days</button>
+    <button class="chip" type="button" data-range="30" aria-pressed="false">30 days</button>
+    <button class="chip" type="button" data-range="0" aria-pressed="false">All</button>
+    <select id="route-filter" class="stats__select" aria-label="Route">
+      <option value="">All routes</option>
+    </select>
+  </div>
+
+  <p id="stats-status" class="stats__status" role="status">Loading…</p>
+
+  <div id="stats-body" hidden>
+    <section class="kpis" aria-label="Totals">
+      <div class="kpi"><span class="kpi__label">Buses spotted</span><span class="kpi__value" id="kpi-spots">–</span></div>
+      <div class="kpi"><span class="kpi__label">Bus reports from riders</span><span class="kpi__value" id="kpi-sightings">–</span></div>
+      <div class="kpi"><span class="kpi__label">Rides logged stop by stop</span><span class="kpi__value" id="kpi-rides">–</span></div>
+      <div class="kpi"><span class="kpi__label">Get-offs</span><span class="kpi__value" id="kpi-offs">–</span></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-punct">
+      <h2 id="h-punct" class="card__title">How early or late the buses are</h2>
+      <p class="card__sub">
+        Each sighting compared with the nearest timetabled bus at that stop.
+        <span id="punct-summary"></span>
+      </p>
+      <div id="chart-punct" class="chart"></div>
+      <p class="card__note">
+        Times at the first stop come straight from the timetable. At later stops
+        they add the <em>estimated</em> ride time, so part of any difference there
+        is the estimate, not the bus. Sightings more than 20 minutes from any
+        timetabled bus are left out.
+      </p>
+      <div class="tablewrap"><table class="table" id="table-punct"></table></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-hours">
+      <h2 id="h-hours" class="card__title">When buses were seen</h2>
+      <p class="card__sub">Sightings by hour of the day, Hong Kong time.</p>
+      <div id="chart-hours" class="chart"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-stops">
+      <h2 id="h-stops" class="card__title">Where the data comes from</h2>
+      <p class="card__sub">Sightings per stop.</p>
+      <div id="chart-stops" class="chart chart--bars"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-hops">
+      <h2 id="h-hops" class="card__title">Measured time between stops</h2>
+      <p class="card__sub">From rides logged stop by stop. Median arrival-to-arrival time, and how many rides it is based on.</p>
+      <div class="tablewrap"><table class="table" id="table-hops"></table></div>
+      <p class="card__note" id="hops-paste"></p>
+    </section>
+
+    <section class="card" aria-labelledby="h-offs">
+      <h2 id="h-offs" class="card__title">Where people get off</h2>
+      <div id="chart-offs" class="chart chart--bars"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-recent">
+      <h2 id="h-recent" class="card__title">Latest</h2>
+      <div class="tablewrap"><table class="table" id="table-recent"></table></div>
+      <button id="download" class="report__more" type="button">Download all as CSV</button>
+      <button id="sign-out-2" class="report__more" type="button">Sign out</button>
+    </section>
+  </div>
+
+  </div>
+
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+</main>
+
+<script src="data/places.generated.js"></script>
+<script src="data/routes.generated.js"></script>
+<script src="data/shuttle-data.js"></script>
+<script src="data/firebase-config.js"></script>
+<script src="lib/geo.js"></script>
+<script src="lib/planner.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.1/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.1/firebase-auth-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.1/firebase-firestore-compat.min.js"></script>
+<script src="stats.js"></script>
+
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>

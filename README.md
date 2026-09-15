@@ -655,15 +655,9 @@ Location never leaves the phone: it only decides *when* to send an ordinary repo
 
 **Where people get off** is logged too, in a separate `alightings` collection. When GPS sees you walk off the route, the ride doesn't just end: it asks *"Looks like you got off at University Administration Building. Right?"* with the nearby stops listed, and saves the guess by itself after 60 seconds if nobody answers (the phone is usually in a pocket by then). Tap another stop to correct it, *Still on the bus* to carry on, or *Don't log where*. "I got off" opens the same list, with no countdown, pre-selected at the stop GPS puts you nearest, or else the last stop logged. Each record says how it was decided — `gps`, `tap` or `picked` — so a guess is never mistaken for a rider's answer.
 
-Each report is an ordinary report with the same ride id, so everyone else sees where that bus is now ("rider on board, logging stops") rather than a trail of every stop it passed. It records when the bus reached the stop by the phone's clock (`at`), so waiting for signal or for the 10-second gap between reports does not distort the timing, and whether GPS or a tap logged it (`auto`).
+Each report is an ordinary report with the same ride id, so everyone else sees where that bus is now ("rider on board, logging stops") rather than a trail of every stop it passed. It records when the bus reached the stop by the phone's clock (`at`), so waiting for signal or for the gap between reports does not distort the timing, and whether GPS or a tap logged it (`auto`).
 
-To turn the logs into ride times:
-
-```bash
-node scripts/ride-times.js
-```
-
-It pairs consecutive taps one stop apart within each ride, takes the median per hop (arrival to arrival, so the dwell at the previous stop is included), and once every hop of a route has three or more samples prints a `rideTimes` line to paste into `data/shuttle-data.js`. A skipped stop leaves a gap, so it never produces a false two-stop "hop". Reports are kept indefinitely, so ride times and punctuality can be modelled across terms (see *Keeping the data* below).
+The private stats page (below) turns these logs into ride times: it pairs consecutive taps one stop apart within each ride, takes the median per hop (arrival to arrival, so the dwell at the previous stop is included), and once every hop of a route has three or more samples shows a `rideTimes` line to paste into `data/shuttle-data.js`. A skipped stop leaves a gap, so it never produces a false two-stop "hop".
 
 ### Setting up Firebase
 
@@ -695,14 +689,20 @@ Reports are **not** deleted: they are the raw material for modelling how long ea
 
 Size is not a concern: a report is well under 1 KB, so Firestore's free 1 GB holds hundreds of thousands.
 
-To take a copy for analysis:
+### The private stats page
 
-```bash
-node scripts/export-reports.js
-```
+`stats.html` shows what has been logged: totals, how early or late buses are against the timetable (overall and per route), sightings by hour, busiest stops, measured stop-to-stop times with ready-to-paste `rideTimes`, where people get off, the latest reports, and a CSV download of everything. It is not linked from the app and is marked `noindex`, but that is not what keeps it private.
 
-It writes `exports/sightings.csv` and `exports/alightings.csv` (one row per report: time, when the bus reached the stop, route, stop, position on the route, ride id, and how it was logged). The `exports/` folder is git-ignored.
+**The rules are.** Anyone — the app included — may read only the last 3 hours of reports, which is all the Track page and trip cards need. The full history can only be read by the Firebase account ids in `FIREBASE_ADMIN_UIDS` (`data/firebase-config.js`); the page signs in with Google and asks. Ids, not emails, so no address sits in the public code.
 
+Punctuality compares each sighting with the nearest timetabled bus at that stop (within 20 minutes). At the first stop that is the published time; at later stops it adds the estimated ride time, so part of any difference there is the estimate — the page says so, and the comparison gets sharper as measured `rideTimes` replace estimates.
+
+Setting up access, once:
+
+1. Firebase console → **Authentication → Sign-in method → Google** → enable.
+2. **Authentication → Settings → Authorized domains** → add `cuhk-campus-bus.vercel.app` (localhost is there already).
+3. Open `stats.html`, sign in. It shows *No access with this account* and your account id.
+4. Put that id in `FIREBASE_ADMIN_UIDS`, run `node scripts/build-firestore-rules.js`, and publish `firestore.rules`.
 
 ## Deliberately not built (v1)
 

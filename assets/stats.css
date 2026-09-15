@@ -1,0 +1,146 @@
+/* ---------------------------------------------------------------------------
+ * Stats page. Same tokens as the app; charts follow a few fixed specs:
+ * columns at most 24px wide with a 4px rounded top and a square base, a 2px
+ * surface gap between neighbours, hairline solid gridlines, text in text
+ * tokens (never the data colour), one tooltip per mark on hover and focus.
+ *
+ * Colour: magnitude is one blue. Punctuality is the only diverging chart —
+ * blue for early, red for late, neutral grey for on time — and every bar is
+ * labelled on the axis, so colour never carries the meaning alone.
+ * ------------------------------------------------------------------------- */
+
+.stats-page {
+  display: block;
+  height: auto;
+  overflow: auto;
+}
+
+.stats {
+  --seq:        #2a78d6;
+  --div-early:  #2a78d6;
+  --div-late:   #d03b3b;
+  --div-mid:    #c9c7c1;
+  --grid:       #e8eaed;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: calc(16px + env(safe-area-inset-top)) var(--gutter) 48px;
+}
+@media (prefers-color-scheme: dark) {
+  .stats {
+    --seq:       #3987e5;
+    --div-early: #3987e5;
+    --div-late:  #e66767;
+    --div-mid:   #5f5e5a;
+    --grid:      #3c4043;
+  }
+}
+
+.stats__back { font-size: 14px; color: var(--accent-ink); text-decoration: none; }
+.stats__title { margin: 10px 0 2px; font-size: 24px; font-weight: 600; }
+.stats__lede { margin: 0; font-size: 14px; color: var(--ink-3); }
+
+.stats__filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 18px 0 6px; }
+.stats__select {
+  min-height: 34px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+}
+.stats__status { margin: 10px 4px; font-size: 14px; color: var(--ink-3); }
+.stats__status:empty { display: none; }
+#stats-body { transition: opacity .15s; }
+#stats-body.is-loading { opacity: .5; }
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.kpi {
+  display: flex;
+  flex-direction: column-reverse;
+  padding: 12px 14px;
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: var(--shadow-1);
+}
+.kpi__label { font-size: 13px; color: var(--ink-3); }
+.kpi__value { font-size: 28px; font-weight: 600; line-height: 1.15; }
+@media (min-width: 640px) { .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.card {
+  margin-top: 14px;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-1);
+}
+.card__title { margin: 0; font-size: 17px; font-weight: 600; }
+.card__sub { margin: 2px 0 10px; font-size: 14px; color: var(--ink-3); }
+.card__note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-3); }
+.card__empty { margin: 8px 0 0; font-size: 14px; color: var(--ink-3); }
+
+.chart { width: 100%; overflow-x: auto; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--ink-3); font-size: 11px; font-family: inherit; }
+.chart .axis-label { fill: var(--ink-2); font-size: 12px; }
+.chart .value-label { fill: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; }
+.chart .grid { stroke: var(--grid); stroke-width: 1; }
+.chart .mark { outline: none; cursor: default; }
+.chart .mark:hover .bar, .chart .mark:focus .bar { filter: brightness(1.15); }
+.chart .mark:focus .hit { stroke: var(--accent); stroke-width: 2; }
+.chart .hit { fill: transparent; }
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  padding: 6px 10px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink);
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.tooltip strong { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+.tooltip span { color: var(--ink-3); }
+
+.tablewrap { overflow-x: auto; margin-top: 10px; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+  padding: 6px 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+.table td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.routecell { white-space: nowrap; }
+.routecell .muted { font-size: 13px; }
+.table tr:last-child td { border-bottom: none; }
+.table .badge { margin-right: 6px; }
+.table .muted { color: var(--ink-3); }
+
+.gate { margin-top: 18px; }
+.gate__btn { max-width: 320px; }
+.gate__uid { margin-top: 14px; }
+.gate__uid code {
+  display: block;
+  padding: 8px 10px;
+  font-size: 14px;
+  word-break: break-all;
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+#admin[hidden], #gate[hidden] { display: none; }
+.paste { display: block; margin-top: 4px; padding: 6px 8px; font-size: 12.5px; background: var(--surface-2); border-radius: 6px; word-break: break-all; }

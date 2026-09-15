@@ -2984,8 +2984,14 @@
       }
       if (code === 'permission-denied') {
         // Either the cooldown, or some of these were already stored by an
-        // earlier attempt (a create on an existing id is refused). Find out
-        // which, drop those, and try the rest again.
+        // earlier attempt (a create on an existing id is refused). The first
+        // refusal is most likely the cooldown: wait it out and try again.
+        // Refused again after that, find out which were already stored.
+        var fresh = due.filter(function (e) { return !e.deniedOnce; });
+        if (fresh.length) {
+          due.forEach(function (e) { e.deniedOnce = true; });
+          return retry(due, TRACK.cooldownSeconds * 1000 + 500);
+        }
         return alreadyStored(due).then(function (stored) {
           if (stored.length) done(stored, true);
           retry(due.filter(function (e) { return stored.indexOf(e) === -1; }),
@@ -3056,7 +3062,13 @@
     return firebaseReady().then(function (db) {
       return Promise.all(entries.map(function (e) {
         return db.collection('spots').doc(e.key).get({ source: 'server' })
-          .then(function (d) { return d.exists ? e : null; });
+          .then(function (d) { return d.exists ? e : null; }, function (err) {
+            // The app may only read the last few hours. A report older than
+            // that which cannot be read back was almost certainly stored by
+            // the interrupted send; a fresh one refused here is the cooldown.
+            var old = Date.now() - e.at > 2.5 * 3600000;
+            return err && err.code === 'permission-denied' && old ? e : null;
+          });
       }));
     }).then(function (found) { return found.filter(Boolean); });
   }

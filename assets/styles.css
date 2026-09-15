@@ -1065,7 +1065,7 @@ li + li > .results__map { border-top: 1px solid var(--line); }
 .sightings__sub { display: block; font-size: 13px; color: var(--ink-3); }
 .sightings__note { margin: 8px 0 0; font-size: 14px; color: var(--ink-3); }
 .sightings__note:empty { display: none; }
-.track__privacy { margin: 16px 4px 0; font-size: 13px; line-height: 1.5; color: var(--ink-3); }
+.track__privacy { margin: 18px 4px 0; font-size: 12px; line-height: 1.45; color: var(--ink-3); }
 
 /* Ride mode */
 .ride__title { display: flex; align-items: center; gap: 8px; }

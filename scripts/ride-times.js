@@ -40,6 +40,20 @@ const MIN_SEC = 10, MAX_SEC = 20 * 60;
 const daysArg = process.argv.indexOf('--days');
 const days = daysArg > -1 ? +process.argv[daysArg + 1] : 365;
 
+// Node's own fetch where it works; curl where it does not (some networks
+// and sandboxes block Node's sockets but not curl).
+async function post(url, body) {
+  try {
+    const res = await fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'application/json' } });
+    return await res.json();
+  } catch (e) {
+    const r = require('child_process').spawnSync('curl', ['-sS', '--max-time', '60', '-X', 'POST', url,
+      '-H', 'Content-Type: application/json', '--data-binary', '@-'], { input: body, encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(r.stderr || 'curl failed');
+    return JSON.parse(r.stdout);
+  }
+}
+
 async function fetchAll() {
   const url = `https://firestore.googleapis.com/v1/projects/${FB.projectId}` +
               `/databases/(default)/documents:runQuery?key=${FB.apiKey}`;
@@ -56,10 +70,8 @@ async function fetchAll() {
         limit: 200,   // the security rules allow at most 200 per query
       },
     };
-    const res = await fetch(url, { method: 'POST', body: JSON.stringify(body),
-                                   headers: { 'Content-Type': 'application/json' } });
-    const rows = await res.json();
-    if (!res.ok || rows[0]?.error) throw new Error(JSON.stringify(rows[0]?.error || rows));
+    const rows = await post(url, JSON.stringify(body));
+    if (!Array.isArray(rows) || rows[0]?.error) throw new Error(JSON.stringify(rows[0]?.error || rows));
     const docs = rows.filter((r) => r.document).map((r) => r.document.fields);
     docs.forEach((f) => out.push({
       trip: f.trip?.stringValue, route: f.route?.stringValue, stop: f.stop?.stringValue,

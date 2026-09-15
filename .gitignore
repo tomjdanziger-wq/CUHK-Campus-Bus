@@ -7,3 +7,6 @@ __pycache__/
 
 # Cached CUHK campus boundary for scripts/extract-places.js — regenerable.
 .overpass-campus.json
+
+# Report exports from scripts/export-reports.js
+exports/

@@ -652,7 +652,7 @@ To turn the logs into ride times:
 node scripts/ride-times.js
 ```
 
-It pairs consecutive taps one stop apart within each ride, takes the median per hop (arrival to arrival, so the dwell at the previous stop is included), and once every hop of a route has three or more samples prints a `rideTimes` line to paste into `data/shuttle-data.js`. A skipped stop leaves a gap, so it never produces a false two-stop "hop". Reports are kept for `keepDays` (120) so a term's worth of rides can be measured.
+It pairs consecutive taps one stop apart within each ride, takes the median per hop (arrival to arrival, so the dwell at the previous stop is included), and once every hop of a route has three or more samples prints a `rideTimes` line to paste into `data/shuttle-data.js`. A skipped stop leaves a gap, so it never produces a false two-stop "hop". Reports are kept indefinitely, so ride times and punctuality can be modelled across terms (see *Keeping the data* below).
 
 ### Setting up Firebase
 
@@ -660,7 +660,7 @@ The project config is in `data/firebase-config.js` (it is a public identifier, n
 
 One-time, in the [Firebase console](https://console.firebase.google.com/): **Authentication → Sign-in method → Anonymous** → enable.
 
-Everything else is deployed from this folder with the official Firebase CLI — the database (in `asia-east2`, Hong Kong), the security rules, and the TTL policies that delete old reports (`firestore.indexes.json`):
+Everything else is deployed from this folder with the official Firebase CLI — the database (in `asia-east2`, Hong Kong) and the security rules:
 
 ```bash
 npx firebase-tools login
@@ -677,6 +677,21 @@ npx firebase-tools deploy --only firestore --project cuhk-buses
 The first two are needed once. After that, only the deploy.
 
 When routes or stops change, run `node scripts/build-firestore-rules.js` and deploy again, or reports from new stops will be refused.
+
+### Keeping the data
+
+Reports are **not** deleted: they are the raw material for modelling how long each hop takes, how punctual each route is, and where people get off. There is no TTL policy on purpose. Each document still carries an `expireAt` 120 days out (the rules require it), but it does nothing unless a TTL policy is created — so do not create one unless you want reports gone after 120 days, and update the note at the bottom of the Track page if you do.
+
+Size is not a concern: a report is well under 1 KB, so Firestore's free 1 GB holds hundreds of thousands.
+
+To take a copy for analysis:
+
+```bash
+node scripts/export-reports.js
+```
+
+It writes `exports/sightings.csv` and `exports/alightings.csv` (one row per report: time, when the bus reached the stop, route, stop, position on the route, ride id, and how it was logged). The `exports/` folder is git-ignored.
+
 
 ## Deliberately not built (v1)
 

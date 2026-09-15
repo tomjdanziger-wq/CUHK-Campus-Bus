@@ -39,8 +39,8 @@
 
   <div id="stats-body" hidden>
     <section class="kpis" aria-label="Totals">
-      <div class="kpi"><span class="kpi__label">Buses spotted</span><span class="kpi__value" id="kpi-spots">–</span></div>
-      <div class="kpi"><span class="kpi__label">Bus reports from riders</span><span class="kpi__value" id="kpi-sightings">–</span></div>
+      <div class="kpi"><span class="kpi__label" id="kpi-arrivals-label">Bus arrivals</span><span class="kpi__value" id="kpi-arrivals">–</span></div>
+      <div class="kpi"><span class="kpi__label">Buses spotted from a stop</span><span class="kpi__value" id="kpi-spots">–</span></div>
       <div class="kpi"><span class="kpi__label">Rides logged stop by stop</span><span class="kpi__value" id="kpi-rides">–</span></div>
       <div class="kpi"><span class="kpi__label">Get-offs</span><span class="kpi__value" id="kpi-offs">–</span></div>
     </section>
@@ -48,28 +48,32 @@
     <section class="card" aria-labelledby="h-punct">
       <h2 id="h-punct" class="card__title">How early or late the buses are</h2>
       <p class="card__sub">
-        Each sighting compared with the nearest timetabled bus at that stop.
+        Each bus arrival compared with the nearest timetabled bus at that stop.
         <span id="punct-summary"></span>
       </p>
       <div id="chart-punct" class="chart"></div>
       <p class="card__note">
         Times at the first stop come straight from the timetable. At later stops
         they add the <em>estimated</em> ride time, so part of any difference there
-        is the estimate, not the bus. Sightings more than 20 minutes from any
-        timetabled bus are left out.
+        is the estimate, not the bus. Arrivals more than 20 minutes from any
+        timetabled bus are left out.<br>
+        Reports of the same route at the same stop within 2 minutes count as one
+        arrival, so a bus five people reported counts once. One person reporting
+        it twice counts as two buses. Two buses under 2 minutes apart, each
+        reported by someone different, count as one.
       </p>
       <div class="tablewrap"><table class="table" id="table-punct"></table></div>
     </section>
 
     <section class="card" aria-labelledby="h-hours">
       <h2 id="h-hours" class="card__title">When buses were seen</h2>
-      <p class="card__sub">Sightings by hour of the day, Hong Kong time.</p>
+      <p class="card__sub">Bus arrivals by hour of the day, Hong Kong time.</p>
       <div id="chart-hours" class="chart"></div>
     </section>
 
     <section class="card" aria-labelledby="h-stops">
       <h2 id="h-stops" class="card__title">Where the data comes from</h2>
-      <p class="card__sub">Sightings per stop.</p>
+      <p class="card__sub">Bus arrivals per stop.</p>
       <div id="chart-stops" class="chart chart--bars"></div>
     </section>
 
@@ -103,6 +107,7 @@
 <script src="../data/firebase-config.js"></script>
 <script src="../lib/geo.js"></script>
 <script src="../lib/planner.js"></script>
+<script src="../lib/arrivals.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.1/firebase-app-compat.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.1/firebase-firestore-compat.min.js"></script>
 <script src="stats.js"></script>

@@ -198,6 +198,25 @@ require('../lib/ridefollow.js');
   console.log(`ride follow: ${rides} simulated rides`);
 }
 
+// Reports → bus arrivals.
+require('../lib/arrivals.js');
+{
+  const group = globalThis.CUHK.arrivals.group;
+  const W = D.config.tracking.confirmWindowMinutes * 60000;
+  const t0 = Date.parse('2026-09-15T23:00:00+08:00');
+  const r = (s, reporter, extra) => Object.assign({ route: 'N', stop: 'wu-yee-sun-down', i: 14, at: t0 + s * 1000, reporter }, extra);
+  const expect = (name, reports, n) => {
+    const got = group(reports, W).length;
+    if (got !== n) problems.push(`arrivals: ${name} gave ${got}, expected ${n}`);
+  };
+  expect('five people, one bus', [r(0, 'a'), r(20, 'b'), r(35, 'c'), r(50, 'd'), r(70, 'e')], 1);
+  expect('one spotter taps two bunched buses', [r(0, 's1'), r(45, 's1')], 2);
+  expect('two buses six minutes apart', [r(0, 'a'), r(360, 'b')], 2);
+  expect('same time, different routes', [r(0, 'a'), r(0, 'b', { route: 'H' })], 2);
+  expect('same time, other side of the road', [r(0, 'a'), r(0, 'b', { stop: 'wu-yee-sun-up', i: 6 })], 2);
+  expect('two bunched buses, each reported twice by a spotter and a rider', [r(0, 's1'), r(10, 'ride1'), r(50, 's1'), r(60, 'ride2')], 2);
+}
+
 // walk router health
 let routed = 0, failed = 0;
 for (let i = 0; i < pool.length; i += 3) {

@@ -1732,6 +1732,9 @@
                 // A spotter's session id is not a ride: every spot stands
                 // on its own in the list.
                 trip: name === 'spots' ? null : v.trip,
+                // Who reported it — a ride, or a spotter's session — so one
+                // person's reports are never merged into a single bus.
+                reporter: v.trip || null,
                 spot: name === 'spots',
                 t: toMillis(v.at || v.t)
               };
@@ -2501,18 +2504,20 @@
       latest.push(sg);
     });
 
-    // Several riders reporting the same bus at the same stop within a few
-    // minutes are one sighting, confirmed — not several buses.
-    var groups = [];
-    latest.forEach(function (sg) {
-      if (!routeById(sg.route) || !stopById(sg.stop)) return;
-      var g = groups.filter(function (x) {
-        return x.route === sg.route && x.stop === sg.stop &&
-               Math.abs(x.t - sg.t) <= TRACK.confirmWindowMinutes * 60000;
-      })[0];
-      var onBoard = !!(sg.trip && tripSize[sg.trip] > 1);
-      if (g) { g.count++; g.onBoard = g.onBoard || onBoard; g.spotted = g.spotted && sg.spot; }
-      else groups.push({ route: sg.route, stop: sg.stop, t: sg.t, count: 1, onBoard: onBoard, spotted: !!sg.spot });
+    // Reports become bus arrivals (lib/arrivals.js): several people reporting
+    // the same bus at the same stop are one arrival, confirmed; one person
+    // reporting it twice is two buses.
+    var groups = window.CUHK.arrivals.group(latest.filter(function (sg) {
+      return routeById(sg.route) && stopById(sg.stop);
+    }).map(function (sg) {
+      return { route: sg.route, stop: sg.stop, at: sg.t, reporter: sg.reporter,
+               onBoard: !!(sg.trip && tripSize[sg.trip] > 1), spot: !!sg.spot };
+    }), TRACK.confirmWindowMinutes * 60000).map(function (a) {
+      return {
+        route: a.route, stop: a.stop, t: a.last, count: a.reporters,
+        onBoard: a.reports.some(function (r) { return r.onBoard; }),
+        spotted: a.reports.every(function (r) { return r.spot; })
+      };
     });
 
     groups.forEach(function (g) {
@@ -2523,7 +2528,7 @@
       var text = el('span', 'sightings__text');
       text.appendChild(el('span', 'sightings__stop', stop.name));
       text.appendChild(el('span', 'sightings__sub',
-        agoText(minutesAgo(g.t)) + (g.count > 1 ? ' · ' + g.count + ' riders' : '') +
+        agoText(minutesAgo(g.t)) + (g.count > 1 ? ' · ' + g.count + ' people reported it' : '') +
         (g.onBoard ? ' · rider on board, logging stops' : '') +
         (g.spotted ? ' · seen from the stop' : '')));
       li.appendChild(text);

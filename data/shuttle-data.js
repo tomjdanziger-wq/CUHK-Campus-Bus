@@ -231,8 +231,10 @@
       gpsResumeGapSeconds: 45,  // no fix on the road for this long (app
                                 // closed, GPS lost) = find the bus again
       cardMaxAgeMinutes: 20,  // a report older than this is not shown on a trip
-      confirmWindowMinutes: 5 // reports of the same bus at the same stop this
-                              // close together count as one, seen by several
+      confirmWindowMinutes: 2 // reports of the same route at the same stop
+                              // this close together are one bus arrival
+                              // (lib/arrivals.js), unless one person reported
+                              // twice — then it was two buses
     },
 
     quickPicks: {

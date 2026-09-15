@@ -189,19 +189,25 @@
     var sightings = inView(all.sightings);
     var offs = inView(all.alightings);
     var seen = spots.concat(sightings);
+    // One bus reported by five people is one arrival (lib/arrivals.js).
+    var arrivals = window.CUHK.arrivals.group(seen.map(function (r) {
+      return { route: r.route, stop: r.stop, i: r.i, at: r.at, reporter: r.trip, kind: r.kind };
+    }), DATA.config.tracking.confirmWindowMinutes * 60000);
 
     var rideCount = {};
     sightings.forEach(function (r) { if (r.trip) rideCount[r.trip] = (rideCount[r.trip] || 0) + 1; });
     var rides = Object.keys(rideCount).filter(function (k) { return rideCount[k] > 1; }).length;
 
+    $('kpi-arrivals').textContent = arrivals.length.toLocaleString();
+    $('kpi-arrivals-label').textContent = 'Bus arrivals, from ' + seen.length.toLocaleString() +
+      (seen.length === 1 ? ' report' : ' reports');
     $('kpi-spots').textContent = spots.length.toLocaleString();
-    $('kpi-sightings').textContent = sightings.length.toLocaleString();
     $('kpi-rides').textContent = rides.toLocaleString();
     $('kpi-offs').textContent = offs.length.toLocaleString();
 
-    renderPunctuality(seen);
-    renderHours(seen);
-    renderBars($('chart-stops'), countBy(seen, 'stop'), function (id) { return stopsById[id].name; }, 'sightings');
+    renderPunctuality(arrivals);
+    renderHours(arrivals);
+    renderBars($('chart-stops'), countBy(arrivals, 'stop'), function (id) { return stopsById[id].name; }, 'arrivals');
     renderBars($('chart-offs'), countBy(offs, 'stop'), function (id) { return stopsById[id].name; }, 'get-offs');
     renderHops(sightings);
     renderRecent(seen.concat(offs));
@@ -307,7 +313,7 @@
       .filter(function (x) { return x.d !== null; });
     if (!measured.length) {
       $('punct-summary').textContent = '';
-      empty(box, 'No sightings match a timetabled bus yet.');
+      empty(box, 'No bus arrivals match a timetabled bus yet.');
       $('table-punct').innerHTML = '';
       return;
     }
@@ -325,7 +331,7 @@
       b.tip = b.m === -10 ? '10+ min early' : b.m === 15 ? '15+ min late'
             : b.m === 0 ? 'on time (±30 s)' : Math.abs(b.m) + ' min ' + (b.m < 0 ? 'early' : 'late');
     });
-    columns(box, bins, { title: 'Minutes early or late', unit: 'sightings', axis: '← early   minutes   late →' });
+    columns(box, bins, { title: 'Minutes early or late', unit: 'arrivals', axis: '← early   minutes   late →' });
 
     var ds = measured.map(function (x) { return x.d; });
     var onTime = ds.filter(function (d) { return Math.abs(d) <= 2; }).length;
@@ -339,7 +345,7 @@
     measured.forEach(function (x) { (byRoute[x.r.route] = byRoute[x.r.route] || []).push(x.d); });
     var table = $('table-punct');
     table.innerHTML = '';
-    table.appendChild(headRow(['Route', 'Seen', 'Typical (min)', '≤ 2 min off']));
+    table.appendChild(headRow(['Route', 'Arrivals', 'Typical (min)', '≤ 2 min off']));
     DATA.routes.filter(function (r) { return byRoute[r.id]; }).forEach(function (r) {
       var xs = byRoute[r.id];
       var tr = el('tr');
@@ -368,7 +374,7 @@
       var h = hk(r.at).hour;
       if (h >= 6) bins[h - 6].n++;
     });
-    columns(box, bins, { title: 'Sightings by hour', unit: 'sightings' });
+    columns(box, bins, { title: 'Arrivals by hour', unit: 'arrivals' });
   }
 
   /** Horizontal bars for a ranked list: label left, value at the tip. */

@@ -695,6 +695,16 @@ Reports are **not** deleted: they are the raw material for modelling how long ea
 
 Size is not a concern: a report is well under 1 KB, so Firestore's free 1 GB holds hundreds of thousands.
 
+### Several reports, one bus — or several buses
+
+Buses bunch (the Night bus especially), and several people may report the same one. Reports are **stored exactly as sent** and turned into **bus arrivals when read**, by `lib/arrivals.js`, which both the Track page and the stats page use. Deciding at read time means a wrong guess never destroys data, and a better rule later applies to everything already collected.
+
+- Reports of the **same route at the same stop** (and the same position on the route) within **2 minutes** of each other are **one arrival**, shown as "3 people reported it". The chain is capped at 4 minutes in total, so a steady stream of reports cannot merge an evening into one bus.
+- **The same reporter twice is two buses.** A spotter who taps the Night bus again 45 seconds later is standing there watching a second one come; a logged ride cannot reach the same stop twice either.
+- **What it cannot do:** two buses under 2 minutes apart, each reported only by different people, count as one.
+
+This matters most for punctuality: counted per report, one late bus reported by five people would count five times.
+
 ### The stats page
 
 Totals, how early or late buses are against the timetable (overall and per route), sightings by hour, busiest stops, measured stop-to-stop times with ready-to-paste `rideTimes`, where people get off, the latest reports, and a CSV download of everything.

@@ -25,9 +25,23 @@
   <!-- a better picture than the timetable alone. No account needed.     -->
   <!-- ---------------------------------------------------------------- -->
   <section id="page-track" class="page" role="tabpanel" aria-labelledby="tab-track">
-    <section class="report" aria-labelledby="report-title">
+    <!-- While on a bus: tap at each stop. Measures how long the route really
+         takes, and shows everyone where that bus is. -->
+    <section id="ride" class="report ride" aria-labelledby="ride-title" hidden>
+      <h2 id="ride-title" class="report__title ride__title"></h2>
+      <p class="report__lede">Tap each time the bus reaches a stop. It measures how long the route really takes.</p>
+      <button id="ride-tap" class="report__send ride__tap" type="button"></button>
+      <div class="ride__actions">
+        <button id="ride-skip" class="report__more" type="button">Bus didn't stop here</button>
+        <button id="ride-end" class="report__more ride__end" type="button">I got off</button>
+      </div>
+      <p id="ride-status" class="report__status" role="status"></p>
+      <ol id="ride-log" class="ride__log"></ol>
+    </section>
+
+    <section id="report" class="report" aria-labelledby="report-title">
       <h2 id="report-title" class="report__title">Just got on a bus?</h2>
-      <p class="report__lede">Tell everyone where. Two taps, no account.</p>
+      <p class="report__lede">Tell everyone where. Two taps, no account. Then, if you like, tap at each stop along the way.</p>
 
       <p class="report__step" id="report-stop-label">Where did you get on?</p>
       <div id="report-stops" class="report__stops" role="group" aria-labelledby="report-stop-label"></div>
@@ -51,8 +65,9 @@
     <p class="footer__note track__privacy">
       Rider reports, not official tracking — buses can be late, early, or
       reported wrongly. Nothing about you is stored: no name, no account, no
-      location, only the stop, the route and the time. Reports disappear after
-      a few hours.
+      location, only the stop, the route and the time. Reports are kept for
+      about a term, to work out how long the routes really take, and then
+      deleted automatically.
     </p>
   </section>
 

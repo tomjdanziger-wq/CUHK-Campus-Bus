@@ -4,45 +4,33 @@ rules_version = '2';
 //
 // Rider reports for the CUHK Shuttle Helper. Anyone may read them. A phone
 // may add one when it is signed in (anonymously — no account), names a stop
-// and route that really go together, and has not reported in the last
-// 45 seconds. Nothing else can be written, changed or deleted.
+// that really is at that position on that route, and has not reported in the
+// last 45 seconds — or 10 seconds when it is the next stop
+// of the same ride. Nothing can be changed or deleted afterwards.
+//
+// Every report carries a random ride id. A ride of one report is a plain
+// "I just got on"; a ride of several is someone logging each stop, which is
+// how the real stop-to-stop times get measured (scripts/ride-times.js).
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function servesStop(stop, route) {
-      let serves = {
-      'area-39-down': ['8'],
-      'area-39-up': ['4', '8', 'H', 'N'],
-      'campus-circuit-east-down': ['8'],
-      'campus-circuit-east-up': ['4', '8'],
-      'campus-circuit-north-down': ['8'],
-      'chan-chun-ha': ['3', '4', '8', 'H', 'N', '6A'],
-      'chung-chi-teaching': ['5', '7', '8', '6A', '6B'],
-      'cw-chu-down': ['3', '4', '5', '8', 'H', 'N', '6A'],
-      'cw-chu-up': ['4', '8'],
-      'fung-king-hey': ['2', '3', '5', '2S'],
-      'new-asia-circle': ['8', 'H', 'N'],
-      'new-asia-college': ['2', '4', '5', '7', 'H', 'N', '2S', '6A', '6B'],
-      'postgrad-hall-1': ['H', 'N', '2S'],
-      'residence-15': ['3', '4', 'H', 'N'],
-      'science-centre': ['3', '8'],
-      'sh-ho-college': ['1', '2', '3', '4', '7', 'H', 'N', '2S', '6A', '6B'],
-      'shaw-college-down': ['3', '4', '7', '8', 'H', 'N'],
-      'shaw-college-up': ['3', '5', '8', 'H', 'N'],
-      'sir-run-run-shaw-hall': ['1', '2', '5', 'H', 'N', '2S'],
-      'station-piazza': ['2', '3', '7', '8', '2S', '6A', '6B'],
-      'uc-staff-residence': ['3', '4', '8', 'H', 'N', '6A'],
-      'united-college-down': ['2', '4', '7', '8', 'H', 'N', '2S', '6A', '6B'],
-      'united-college-up': ['2', '5', '2S'],
-      'univ-admin': ['1', '2', '3', '4', '7', '8', 'H', 'N', '2S', '6A', '6B'],
-      'univ-sports-centre': ['1', '2', '3', '5', 'H', 'N', '2S'],
-      'univ-station': ['1', '2', '4', '8', 'H', 'N', '2S'],
-      'wu-yee-sun-down': ['3', '4', '7', '8', 'H', 'N', '6A'],
-      'wu-yee-sun-up': ['3', '5', '8', 'H', 'N'],
-      'yiap': ['3', '4', '8']
+    function stopOnRoute(route, i, stop) {
+      let routes = {
+      '1': ['univ-station', 'univ-sports-centre', 'sir-run-run-shaw-hall', 'univ-admin', 'sh-ho-college', 'univ-station'],
+      '2': ['station-piazza', 'univ-sports-centre', 'sir-run-run-shaw-hall', 'fung-king-hey', 'united-college-up', 'new-asia-college', 'united-college-down', 'univ-admin', 'sh-ho-college', 'univ-station'],
+      '3': ['yiap', 'univ-sports-centre', 'science-centre', 'fung-king-hey', 'wu-yee-sun-up', 'shaw-college-up', 'cw-chu-down', 'residence-15', 'uc-staff-residence', 'chan-chun-ha', 'shaw-college-down', 'wu-yee-sun-down', 'univ-admin', 'sh-ho-college', 'station-piazza'],
+      '4': ['yiap', 'campus-circuit-east-up', 'cw-chu-up', 'area-39-up', 'cw-chu-down', 'residence-15', 'uc-staff-residence', 'chan-chun-ha', 'shaw-college-down', 'wu-yee-sun-down', 'new-asia-college', 'united-college-down', 'univ-admin', 'sh-ho-college', 'univ-station'],
+      '5': ['chung-chi-teaching', 'univ-sports-centre', 'sir-run-run-shaw-hall', 'fung-king-hey', 'united-college-up', 'new-asia-college', 'wu-yee-sun-up', 'shaw-college-up', 'cw-chu-down'],
+      '7': ['shaw-college-down', 'wu-yee-sun-down', 'new-asia-college', 'united-college-down', 'univ-admin', 'sh-ho-college', 'station-piazza', 'chung-chi-teaching'],
+      '8': ['yiap', 'campus-circuit-east-up', 'cw-chu-up', 'area-39-up', 'cw-chu-down', 'uc-staff-residence', 'chan-chun-ha', 'shaw-college-down', 'wu-yee-sun-down', 'univ-admin', 'science-centre', 'new-asia-circle', 'united-college-down', 'wu-yee-sun-up', 'shaw-college-up', 'area-39-down', 'campus-circuit-north-down', 'campus-circuit-east-down', 'univ-station', 'station-piazza', 'chung-chi-teaching'],
+      'H': ['univ-station', 'postgrad-hall-1', 'univ-sports-centre', 'sir-run-run-shaw-hall', 'new-asia-circle', 'united-college-down', 'wu-yee-sun-up', 'shaw-college-up', 'area-39-up', 'cw-chu-down', 'residence-15', 'uc-staff-residence', 'chan-chun-ha', 'shaw-college-down', 'wu-yee-sun-down', 'new-asia-college', 'united-college-down', 'univ-admin', 'sh-ho-college', 'postgrad-hall-1', 'univ-station'],
+      'N': ['univ-station', 'postgrad-hall-1', 'univ-sports-centre', 'sir-run-run-shaw-hall', 'new-asia-circle', 'united-college-down', 'wu-yee-sun-up', 'shaw-college-up', 'area-39-up', 'cw-chu-down', 'residence-15', 'uc-staff-residence', 'chan-chun-ha', 'shaw-college-down', 'wu-yee-sun-down', 'new-asia-college', 'united-college-down', 'univ-admin', 'sh-ho-college', 'postgrad-hall-1', 'univ-station'],
+      '2S': ['station-piazza', 'postgrad-hall-1', 'univ-sports-centre', 'sir-run-run-shaw-hall', 'fung-king-hey', 'united-college-up', 'new-asia-college', 'united-college-down', 'univ-admin', 'sh-ho-college', 'postgrad-hall-1', 'univ-station'],
+      '6A': ['cw-chu-down', 'uc-staff-residence', 'chan-chun-ha', 'wu-yee-sun-down', 'new-asia-college', 'united-college-down', 'univ-admin', 'sh-ho-college', 'station-piazza', 'chung-chi-teaching'],
+      '6B': ['new-asia-college', 'united-college-down', 'univ-admin', 'sh-ho-college', 'station-piazza', 'chung-chi-teaching']
       };
-      return stop in serves && route in serves[stop];
+      return route in routes && i >= 0 && i < routes[route].size() && routes[route][i] == stop;
     }
 
     match /sightings/{id} {
@@ -50,15 +38,20 @@ service cloud.firestore {
       allow list: if request.query.limit <= 200;
 
       allow create: if request.auth != null
-        && request.resource.data.keys().hasOnly(['stop', 'route', 't', 'expireAt'])
+        && request.resource.data.keys().hasOnly(['stop', 'route', 'i', 'trip', 't', 'expireAt'])
         && request.resource.data.stop is string
         && request.resource.data.route is string
-        && servesStop(request.resource.data.stop, request.resource.data.route)
+        && request.resource.data.i is int
+        && stopOnRoute(request.resource.data.route, request.resource.data.i, request.resource.data.stop)
+        && request.resource.data.trip is string
+        && request.resource.data.trip.size() >= 8 && request.resource.data.trip.size() <= 32
         && request.resource.data.t == request.time
         && request.resource.data.expireAt is timestamp
-        && request.resource.data.expireAt <= request.time + duration.value(185, 'm')
-        // The cooldown marker must move in this same batch...
-        && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.t == request.time;
+        // Kept long enough to measure ride times across a term.
+        && request.resource.data.expireAt <= request.time + duration.value(121, 'd')
+        // The cooldown marker must move in this same batch, for this ride...
+        && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.t == request.time
+        && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.trip == request.resource.data.trip;
 
       allow update, delete: if false;
     }
@@ -68,12 +61,16 @@ service cloud.firestore {
       allow read: if false;
       // ...and it may only move once the cooldown has passed.
       allow create: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['t'])
+        && request.resource.data.keys().hasOnly(['t', 'trip'])
+        && request.resource.data.trip is string
         && request.resource.data.t == request.time;
       allow update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['t'])
+        && request.resource.data.keys().hasOnly(['t', 'trip'])
+        && request.resource.data.trip is string
         && request.resource.data.t == request.time
-        && request.time > resource.data.t + duration.value(45, 's');
+        && (request.time > resource.data.t + duration.value(45, 's')
+            || (request.resource.data.trip == resource.data.trip
+                && request.time > resource.data.t + duration.value(10, 's')));
       allow delete: if false;
     }
   }

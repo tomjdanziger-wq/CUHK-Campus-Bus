@@ -624,6 +624,20 @@ Everything is labelled as a rider report with its age. It is never called live a
 
 Tuning lives in `config.tracking` in `data/shuttle-data.js`.
 
+### Logging a ride
+
+After reporting, the page switches to the ride: one big button naming the next stop on the route. Tap it each time the bus gets there; "Bus didn't stop here" moves on without a report, and "I got off" ends it. The ride survives closing the app, and ends by itself after 40 minutes without a tap.
+
+Each tap is an ordinary report with the same ride id, so everyone else sees where that bus is now ("rider on board, logging stops") rather than a trail of every stop it passed. The next stop of the same ride only needs a 10-second gap, not the 45-second cooldown.
+
+To turn the logs into ride times:
+
+```bash
+node scripts/ride-times.js
+```
+
+It pairs consecutive taps one stop apart within each ride, takes the median per hop (arrival to arrival, so the dwell at the previous stop is included), and once every hop of a route has three or more samples prints a `rideTimes` line to paste into `data/shuttle-data.js`. A skipped stop leaves a gap, so it never produces a false two-stop "hop". Reports are kept for `keepDays` (120) so a term's worth of rides can be measured.
+
 ### Setting up Firebase
 
 The project config is in `data/firebase-config.js` (it is a public identifier, not a secret — the rules protect the data). To use a different project, replace it; to switch tracking off, set it to `null`.
@@ -633,7 +647,7 @@ In the [Firebase console](https://console.firebase.google.com/):
 1. **Authentication → Sign-in method → Anonymous** → enable.
 2. **Firestore Database → Create database** → a region near Hong Kong (`asia-east2`) → production mode.
 3. **Firestore Database → Rules** → replace everything with the contents of `firestore.rules` → **Publish**.
-4. **Firestore Database → TTL policies** (under the database settings) → create a policy on collection `sightings`, field `expireAt`. Firestore then deletes reports after `keepMinutes` on its own.
+4. **Firestore Database → TTL policies** (under the database settings) → create a policy on collection `sightings`, field `expireAt`. Firestore then deletes reports after `keepDays` on its own.
 
 When routes or stops change, run `node scripts/build-firestore-rules.js` and publish the rules again, or reports from new stops will be refused.
 

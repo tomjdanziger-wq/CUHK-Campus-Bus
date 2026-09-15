@@ -1067,6 +1067,21 @@ li + li > .results__map { border-top: 1px solid var(--line); }
 .sightings__note:empty { display: none; }
 .track__privacy { margin: 16px 4px 0; font-size: 13px; line-height: 1.5; color: var(--ink-3); }
 
+/* Ride mode */
+.ride__title { display: flex; align-items: center; gap: 8px; }
+.ride__tap { min-height: 64px; font-size: 18px; }
+.ride__actions { display: flex; justify-content: space-between; margin-top: 6px; }
+.ride__actions .report__more { margin: 0; }
+.ride__end { color: var(--danger); }
+.ride__log { list-style: none; margin: 10px 0 0; padding: 0; }
+.ride__log:empty { display: none; }
+.ride__entry { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 14.5px; }
+.ride__entry + .ride__entry { border-top: 1px solid var(--line); }
+.ride__entry:first-child .ride__stop { font-weight: 600; }
+.ride__stop { min-width: 0; }
+.ride__time { flex-shrink: 0; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+#report[hidden], #ride[hidden] { display: none; }
+
 /* A rider report on a trip card: useful, but never mistaken for the timetable. */
 .seenline {
   display: flex;

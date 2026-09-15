@@ -1839,7 +1839,7 @@
           track.status = 'ok';
           track.list = snap.docs.map(function (d) {
             var v = d.data({ serverTimestamps: 'estimate' });
-            return { id: d.id, stop: v.stop, route: v.route, t: toMillis(v.t) };
+            return { id: d.id, stop: v.stop, route: v.route, i: v.i, trip: v.trip, t: toMillis(v.t) };
           }).filter(function (sg) {
             return Date.now() - sg.t <= TRACK.showMinutes * 60000;
           });
@@ -1857,7 +1857,7 @@
   }
 
   function sightingsChanged() {
-    if (currentPage === PAGE_TRACK) { renderSightings(); renderReport(); }
+    if (currentPage === PAGE_TRACK) { renderSightings(); if (!track.ride) renderReport(); }
     if (state.origin && state.destination) render();
   }
 
@@ -1917,7 +1917,9 @@
     }
 
     var shown = track.showAllStops || !ref ? stops : stops.slice(0, 6);
-    $('report-more').hidden = track.showAllStops || !ref;
+    // A toggle both ways: once the whole list was open it could not be closed.
+    $('report-more').hidden = !ref;
+    $('report-more').textContent = track.showAllStops ? 'Show fewer stops' : 'Show all stops';
 
     shown.forEach(function (st) {
       var b = el('button', 'report__stop');
@@ -1930,6 +1932,13 @@
           d < 1000 ? Math.round(d / 10) * 10 + ' m' : (d / 1000).toFixed(1) + ' km'));
       }
       b.addEventListener('click', function () {
+        // Tapping the chosen stop again un-chooses it and folds the buses away.
+        if (track.stop === st.id) {
+          track.stop = null;
+          track.route = null;
+          renderReport();
+          return;
+        }
         track.stop = st.id;
         var serving = DATA.routes.filter(function (r) {
           return r.stops.indexOf(st.id) !== -1 && planner.runsToday(r, new Date());
@@ -1987,71 +1996,214 @@
     }
   }
 
-  function sendReport() {
-    if (!track.stop || !track.route) return;
-    var stop = track.stop, route = track.route;
-    var status = $('report-status');
-    $('report-send').disabled = true;
-    status.textContent = 'Sending…';
+  /** A random id for one ride. Nothing links it to the phone or person. */
+  function newTripId() {
+    var bytes = new Uint8Array(8);
+    (window.crypto || window.msCrypto).getRandomValues(bytes);
+    return Array.prototype.map.call(bytes, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  }
 
-    firebaseReady().then(function (db) {
+  /**
+   * Write one report: this stop, at this position on this route, as part of
+   * this ride. Rejects with { code } — 'off', 'permission-denied' (cooldown),
+   * 'slow', or whatever Firestore said.
+   */
+  function postSighting(route, i, stop, trip) {
+    return firebaseReady().then(function (db) {
       var fb = window.firebase;
       var uid = fb.auth().currentUser.uid;
       var now = fb.firestore.FieldValue.serverTimestamp();
 
       // One batch, two writes: the report, and this phone's cooldown marker.
       // The rules only accept the report if the marker moves in the same
-      // batch, and only let the marker move once the cooldown has passed.
+      // batch, and only let the marker move once the cooldown has passed —
+      // a short one when it is the next stop of the same ride.
       var batch = db.batch();
       batch.set(db.collection('sightings').doc(), {
-        stop: stop,
-        route: route,
-        t: now,
+        stop: stop, route: route, i: i, trip: trip, t: now,
         // Firestore's TTL policy deletes the document after this time.
-        expireAt: fb.firestore.Timestamp.fromMillis(Date.now() + TRACK.keepMinutes * 60000)
+        expireAt: fb.firestore.Timestamp.fromMillis(Date.now() + TRACK.keepDays * 86400000)
       });
-      batch.set(db.collection('throttle').doc(uid), { t: now });
+      batch.set(db.collection('throttle').doc(uid), { t: now, trip: trip });
 
       // Firestore never fails a write for lack of signal; it queues it and
-      // keeps trying. Don't leave the button on "Sending…" forever.
+      // keeps trying. Don't leave a button on "Sending…" forever.
       return Promise.race([
         batch.commit(),
         new Promise(function (resolve, reject) {
           setTimeout(function () { reject({ code: 'slow' }); }, 12000);
         })
       ]);
-    }).then(function () {
-      status.textContent = 'Shared. Thank you — that helps everyone waiting.';
-      track.cooldownUntil = Date.now() + TRACK.cooldownSeconds * 1000;
-      track.stop = null;
-      track.route = null;
-      tickCooldown();
-      fetchSightings();
-    }).catch(function (err) {
-      var code = err && err.code;
-      if (err && err.message === 'off') {
-        track.status = 'off';
-        status.textContent = 'Tracking is not switched on yet.';
-      } else if (code === 'permission-denied') {
-        // Almost always the cooldown. (Or a stop/route pair the rules do not
-        // know, which the app never offers.)
-        status.textContent = 'You just reported. Try again in a moment.';
+    }, function (err) {
+      throw { code: err && err.message === 'off' ? 'off' : 'unavailable' };
+    });
+  }
+
+  function describeFailure(err, cooldownText) {
+    var code = err && err.code;
+    if (code === 'off') { track.status = 'off'; return 'Tracking is not switched on yet.'; }
+    if (code === 'permission-denied') return cooldownText;
+    if (code === 'slow') return 'Slow connection — it will go through as soon as it can.';
+    if (code === 'unavailable' || !navigator.onLine) return 'No connection. Try again when you have signal.';
+    if (window.console) console.warn('Report failed:', err);
+    return 'That did not go through. Try again.';
+  }
+
+  function sendReport() {
+    if (!track.stop || !track.route) return;
+    var stop = track.stop, route = routeById(track.route);
+    var i = route.stops.indexOf(stop);
+    var trip = newTripId();
+    var status = $('report-status');
+    $('report-send').disabled = true;
+    status.textContent = 'Sending…';
+
+    postSighting(route.id, i, stop, trip).then(started, function (err) {
+      if (err && err.code === 'slow') return started();    // queued; carry on
+      status.textContent = describeFailure(err, 'You just reported. Try again in a moment.');
+      if (err && err.code === 'permission-denied') {
         track.cooldownUntil = Date.now() + TRACK.cooldownSeconds * 1000;
         tickCooldown();
-      } else if (code === 'slow') {
-        status.textContent = 'Slow connection — your report will go through as soon as it can.';
-        track.cooldownUntil = Date.now() + TRACK.cooldownSeconds * 1000;
-        track.stop = null;
-        track.route = null;
-        tickCooldown();
-      } else if (code === 'unavailable' || !navigator.onLine) {
-        status.textContent = 'No connection. Try again when you have signal.';
-      } else {
-        status.textContent = 'That did not go through. Try again.';
-        if (window.console) console.warn('Report failed:', err);
       }
       renderReport();
     });
+
+    function started() {
+      status.textContent = '';
+      track.cooldownUntil = Date.now() + TRACK.cooldownSeconds * 1000;
+      track.stop = null;
+      track.route = null;
+      // Straight into logging the ride: the next useful tap is the next stop,
+      // and "I got off" is one tap away for anyone who only wanted to report.
+      track.ride = { trip: trip, route: route.id, i: i,
+                     log: [{ i: i, stop: stop, t: Date.now() }], nextAllowed: Date.now() + TRACK.rideTapSeconds * 1000 };
+      saveRide();
+      renderTrackMode();
+      fetchSightings();
+    }
+  }
+
+  // ---- ride mode ------------------------------------------------------------
+
+  function saveRide() {
+    try {
+      if (track.ride) localStorage.setItem('ride', JSON.stringify(track.ride));
+      else localStorage.removeItem('ride');
+    } catch (e) { /* private mode: the ride just won't survive a reload */ }
+  }
+
+  function loadRide() {
+    try {
+      var r = JSON.parse(localStorage.getItem('ride') || 'null');
+      var last = r && r.log && r.log.length ? r.log[r.log.length - 1].t : 0;
+      if (r && routeById(r.route) && Date.now() - last < TRACK.rideIdleMinutes * 60000) return r;
+      localStorage.removeItem('ride');
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+
+  function clock(t) {
+    var d = new Date(t);
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' +
+           ('0' + d.getSeconds()).slice(-2);
+  }
+
+  function span(ms) {
+    var sec = Math.max(0, Math.round(ms / 1000));
+    return Math.floor(sec / 60) + ':' + ('0' + (sec % 60)).slice(-2);
+  }
+
+  function endRide(message) {
+    track.ride = null;
+    saveRide();
+    renderTrackMode();
+    $('report-status').textContent = message || '';
+  }
+
+  function renderRide() {
+    var ride = track.ride;
+    var route = routeById(ride.route);
+    var title = $('ride-title');
+    title.innerHTML = '';
+    title.appendChild(routeBadge(route));
+    title.appendChild(document.createTextNode(' On ' + route.name));
+
+    var next = ride.i + 1;
+    var tap = $('ride-tap');
+    if (next >= route.stops.length) {
+      endRide('End of the route. Thanks for logging it!');
+      return;
+    }
+    var nextStop = stopById(route.stops[next]);
+    var wait = Math.ceil((ride.nextAllowed - Date.now()) / 1000);
+    tap.disabled = wait > 0 || !!ride.sending;
+    tap.textContent = ride.sending ? 'Sending…'
+      : 'At ' + (nextStop ? nextStop.name : 'the next stop') + (wait > 0 ? ' (' + wait + ' s)' : '');
+    $('ride-skip').disabled = !!ride.sending;
+
+    var log = $('ride-log');
+    log.innerHTML = '';
+    ride.log.slice().reverse().forEach(function (e, k, arr) {
+      var li = el('li', 'ride__entry');
+      var st = stopById(e.stop);
+      li.appendChild(el('span', 'ride__stop', st ? st.name : e.stop));
+      var prev = arr[k + 1];
+      li.appendChild(el('span', 'ride__time',
+        clock(e.t) + (prev ? ' · +' + span(e.t - prev.t) : ' · got on')));
+      log.appendChild(li);
+    });
+
+    if (wait > 0) setTimeout(function () { if (track.ride === ride) renderRide(); }, 1000);
+  }
+
+  function rideTap() {
+    var ride = track.ride;
+    if (!ride || ride.sending) return;
+    var route = routeById(ride.route);
+    var next = ride.i + 1;
+    var stop = route.stops[next];
+    var status = $('ride-status');
+    ride.sending = true;
+    renderRide();
+
+    postSighting(route.id, next, stop, ride.trip).then(logged, function (err) {
+      if (err && err.code === 'slow') return logged();
+      ride.sending = false;
+      status.textContent = describeFailure(err, 'Too quick — wait a few seconds and tap again.');
+      if (err && err.code === 'permission-denied') ride.nextAllowed = Date.now() + TRACK.rideTapSeconds * 1000;
+      renderRide();
+    });
+
+    // The time is recorded on tap, not on the server's reply, so a slow
+    // network does not stretch the measurement. (The server keeps its own.)
+    var tappedAt = Date.now();
+    function logged() {
+      ride.sending = false;
+      ride.i = next;
+      ride.log.push({ i: next, stop: stop, t: tappedAt });
+      ride.nextAllowed = Date.now() + TRACK.rideTapSeconds * 1000;
+      status.textContent = '';
+      saveRide();
+      renderRide();
+    }
+  }
+
+  function rideSkip() {
+    var ride = track.ride;
+    if (!ride) return;
+    // The bus drove past without stopping. Move on without a report — and
+    // the gap in the log keeps this hop out of the timing.
+    ride.i += 1;
+    saveRide();
+    renderRide();
+  }
+
+  /** The Track page shows either the ride in progress or the report form. */
+  function renderTrackMode() {
+    var riding = !!track.ride;
+    $('ride').hidden = !riding;
+    $('report').hidden = riding;
+    if (riding) renderRide(); else renderReport();
   }
 
   function tickCooldown() {
@@ -2077,17 +2229,30 @@
       return;
     }
 
+    // A rider logging a ride leaves a report at every stop. Show only where
+    // that bus was last seen, not a trail of every stop it passed.
+    var latest = [], seenTrip = {}, tripSize = {};
+    track.list.forEach(function (sg) {
+      if (sg.trip) tripSize[sg.trip] = (tripSize[sg.trip] || 0) + 1;
+    });
+    track.list.forEach(function (sg) {                     // newest first
+      if (sg.trip && seenTrip[sg.trip]) return;
+      if (sg.trip) seenTrip[sg.trip] = true;
+      latest.push(sg);
+    });
+
     // Several riders reporting the same bus at the same stop within a few
     // minutes are one sighting, confirmed — not several buses.
     var groups = [];
-    track.list.forEach(function (sg) {
+    latest.forEach(function (sg) {
       if (!routeById(sg.route) || !stopById(sg.stop)) return;
       var g = groups.filter(function (x) {
         return x.route === sg.route && x.stop === sg.stop &&
                Math.abs(x.t - sg.t) <= TRACK.confirmWindowMinutes * 60000;
       })[0];
-      if (g) g.count++;
-      else groups.push({ route: sg.route, stop: sg.stop, t: sg.t, count: 1 });
+      var onBoard = sg.trip && tripSize[sg.trip] > 1;
+      if (g) { g.count++; g.onBoard = g.onBoard || onBoard; }
+      else groups.push({ route: sg.route, stop: sg.stop, t: sg.t, count: 1, onBoard: onBoard });
     });
 
     groups.forEach(function (g) {
@@ -2098,7 +2263,8 @@
       var text = el('span', 'sightings__text');
       text.appendChild(el('span', 'sightings__stop', stop.name));
       text.appendChild(el('span', 'sightings__sub',
-        agoText(minutesAgo(g.t)) + (g.count > 1 ? ' · ' + g.count + ' riders' : '')));
+        agoText(minutesAgo(g.t)) + (g.count > 1 ? ' · ' + g.count + ' riders' : '') +
+        (g.onBoard ? ' · rider on board, logging stops' : '')));
       li.appendChild(text);
       list.appendChild(li);
     });
@@ -2108,7 +2274,7 @@
   }
 
   function openTrack() {
-    renderReport();
+    renderTrackMode();
     renderSightings();
     fetchSightings();
 
@@ -2127,10 +2293,17 @@
 
   function wireTrack() {
     $('report-more').addEventListener('click', function () {
-      track.showAllStops = true;
+      track.showAllStops = !track.showAllStops;
       renderReport();
     });
     $('report-send').addEventListener('click', sendReport);
+    $('ride-tap').addEventListener('click', rideTap);
+    $('ride-skip').addEventListener('click', rideSkip);
+    $('ride-end').addEventListener('click', function () {
+      var n = track.ride ? track.ride.log.length : 0;
+      endRide(n > 1 ? 'Thanks — ' + n + ' stops logged.' : '');
+    });
+    track.ride = loadRide();
 
     fetchSightings();
     // New reports arrive through the listener. This only re-draws the ages

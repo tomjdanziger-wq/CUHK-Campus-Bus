@@ -22,13 +22,11 @@ require('../data/shuttle-data.js');
 const DATA = globalThis.SHUTTLE_DATA;
 const T = DATA.config.tracking;
 
-const serves = {};
-DATA.routes.forEach((r) => r.stops.forEach((s) => {
-  (serves[s] = serves[s] || []).includes(r.id) || serves[s].push(r.id);
-}));
-
-const map = Object.keys(serves).sort()
-  .map((s) => `      '${s}': [${serves[s].map((r) => `'${r}'`).join(', ')}]`)
+// Every route's stops in order. A report names the stop's position on the
+// route, so the rules can check the stop is really there — and so ride logs
+// on loops that pass a stop twice stay unambiguous.
+const map = DATA.routes
+  .map((r) => `      '${r.id}': [${r.stops.map((s) => `'${s}'`).join(', ')}]`)
   .join(',\n');
 
 const rules = `rules_version = '2';
@@ -37,17 +35,22 @@ const rules = `rules_version = '2';
 //
 // Rider reports for the CUHK Shuttle Helper. Anyone may read them. A phone
 // may add one when it is signed in (anonymously — no account), names a stop
-// and route that really go together, and has not reported in the last
-// ${T.cooldownSeconds} seconds. Nothing else can be written, changed or deleted.
+// that really is at that position on that route, and has not reported in the
+// last ${T.cooldownSeconds} seconds — or ${T.rideTapSeconds} seconds when it is the next stop
+// of the same ride. Nothing can be changed or deleted afterwards.
+//
+// Every report carries a random ride id. A ride of one report is a plain
+// "I just got on"; a ride of several is someone logging each stop, which is
+// how the real stop-to-stop times get measured (scripts/ride-times.js).
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function servesStop(stop, route) {
-      let serves = {
+    function stopOnRoute(route, i, stop) {
+      let routes = {
 ${map}
       };
-      return stop in serves && route in serves[stop];
+      return route in routes && i >= 0 && i < routes[route].size() && routes[route][i] == stop;
     }
 
     match /sightings/{id} {
@@ -55,15 +58,20 @@ ${map}
       allow list: if request.query.limit <= 200;
 
       allow create: if request.auth != null
-        && request.resource.data.keys().hasOnly(['stop', 'route', 't', 'expireAt'])
+        && request.resource.data.keys().hasOnly(['stop', 'route', 'i', 'trip', 't', 'expireAt'])
         && request.resource.data.stop is string
         && request.resource.data.route is string
-        && servesStop(request.resource.data.stop, request.resource.data.route)
+        && request.resource.data.i is int
+        && stopOnRoute(request.resource.data.route, request.resource.data.i, request.resource.data.stop)
+        && request.resource.data.trip is string
+        && request.resource.data.trip.size() >= 8 && request.resource.data.trip.size() <= 32
         && request.resource.data.t == request.time
         && request.resource.data.expireAt is timestamp
-        && request.resource.data.expireAt <= request.time + duration.value(${T.keepMinutes + 5}, 'm')
-        // The cooldown marker must move in this same batch...
-        && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.t == request.time;
+        // Kept long enough to measure ride times across a term.
+        && request.resource.data.expireAt <= request.time + duration.value(${T.keepDays + 1}, 'd')
+        // The cooldown marker must move in this same batch, for this ride...
+        && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.t == request.time
+        && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.trip == request.resource.data.trip;
 
       allow update, delete: if false;
     }
@@ -73,12 +81,16 @@ ${map}
       allow read: if false;
       // ...and it may only move once the cooldown has passed.
       allow create: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['t'])
+        && request.resource.data.keys().hasOnly(['t', 'trip'])
+        && request.resource.data.trip is string
         && request.resource.data.t == request.time;
       allow update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['t'])
+        && request.resource.data.keys().hasOnly(['t', 'trip'])
+        && request.resource.data.trip is string
         && request.resource.data.t == request.time
-        && request.time > resource.data.t + duration.value(${T.cooldownSeconds}, 's');
+        && (request.time > resource.data.t + duration.value(${T.cooldownSeconds}, 's')
+            || (request.resource.data.trip == resource.data.trip
+                && request.time > resource.data.t + duration.value(${T.rideTapSeconds}, 's')));
       allow delete: if false;
     }
   }
@@ -86,4 +98,4 @@ ${map}
 `;
 
 fs.writeFileSync(path.join(__dirname, '..', 'firestore.rules'), rules);
-console.log(`wrote firestore.rules (${Object.keys(serves).length} stops)`);
+console.log(`wrote firestore.rules (${DATA.routes.length} routes)`);

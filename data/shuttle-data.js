@@ -228,6 +228,8 @@
                                 // the bus (more than it drives between fixes)
       gpsConfirmJumpMetres: 120, // a move further than this needs a second
                                 // fix to agree (one stray fix is not a bus)
+      gpsResumeGapSeconds: 45,  // no fix on the road for this long (app
+                                // closed, GPS lost) = find the bus again
       cardMaxAgeMinutes: 20,  // a report older than this is not shown on a trip
       confirmWindowMinutes: 5 // reports of the same bus at the same stop this
                               // close together count as one, seen by several

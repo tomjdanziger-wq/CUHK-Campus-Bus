@@ -2370,7 +2370,7 @@
     var f = track.follow;
     if (!ride || !f) return;
     var fix = { lat: pos.coords.latitude, lng: pos.coords.longitude,
-                accuracy: pos.coords.accuracy || 999 };
+                accuracy: pos.coords.accuracy || 999, time: pos.timestamp || Date.now() };
     f.fixes = (f.fixes || 0) + 1;
     f.error = null;
     liveState().fix = fix;                          // the blue dot on the maps
@@ -2380,6 +2380,16 @@
     DATA.stops.forEach(function (st) { byId[st.id] = st; });
     var res = follower.step(f, ride, fix, route, DATA.routeShapes[ride.route], byId, TRACK);
 
+    if (res.resumedAfter > ride.i) {
+      // Tracking was away (app closed, screen locked, GPS lost) and has found
+      // the bus again further along. The stops in between were not seen:
+      // skip them rather than make up times. The "got on" report stands.
+      var skipped = res.resumedAfter - ride.i;
+      ride.i = res.resumedAfter;
+      saveRide();
+      $('ride-status').textContent = 'Found the bus again — ' + skipped +
+        (skipped === 1 ? ' stop' : ' stops') + ' passed while tracking was paused.';
+    }
     if (res.arrived >= 0) recordArrival(res.arrived, pos.timestamp || Date.now(), true);
 
     if (res.gotOff) {
@@ -2401,7 +2411,12 @@
   function startRideFollow() {
     var ride = track.ride;
     if (!ride || !ride.follow || track.follow || !navigator.geolocation) return;
-    track.follow = { watchId: null, fixes: 0, offRoute: 0, error: null, lock: null };
+    // Starting (or restarting) to follow: the last thing known is the last
+    // stop logged. If that was a while ago, the follower treats it as a gap
+    // and looks for where the bus is now.
+    var lastLogged = ride.log.length ? ride.log[ride.log.length - 1].t : Date.now();
+    track.follow = { watchId: null, fixes: 0, offRoute: 0, error: null, lock: null,
+                     lastMatchAt: lastLogged };
     try {
       track.follow.watchId = navigator.geolocation.watchPosition(onRideFix, function (err) {
         if (!track.follow) return;

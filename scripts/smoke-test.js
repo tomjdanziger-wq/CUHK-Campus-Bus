@@ -170,6 +170,30 @@ require('../lib/ridefollow.js');
       if (r.gotOff) gotOff = true;
     }
     if (!gotOff) problems.push(`ride-follow: route ${route.id} did not notice the rider walking off`);
+
+    // Reopening the app mid-ride: the last stop logged is well behind the
+    // bus. It must find the bus again, skip the stops it did not see, log the
+    // rest, and not call it getting off.
+    if (shape.stopIndices.length >= 8) {
+      const from = 1, back = Math.min(route.stops.length - 3, 5);
+      const f2 = { lastMatchAt: 0 }, r2 = { i: from };
+      const logged = [];
+      let off = false, resumedAfter = -1, t = 10 * 60000;
+      for (let k = shape.stopIndices[back] - 2; k <= shape.stopIndices[shape.stopIndices.length - 1] && !off; k++) {
+        const [lat, lng] = shape.line[k];
+        t += 3000;
+        const r = follow.step(f2, r2, { lat, lng, accuracy: 15, time: t }, route, shape, byId, T);
+        if (r.resumedAfter >= 0) { resumedAfter = r.resumedAfter; r2.i = r.resumedAfter; }
+        if (r.arrived >= 0) { logged.push(r.arrived); r2.i = r.arrived; }
+        if (r.gotOff) off = true;
+      }
+      if (off) problems.push(`ride-follow resume: route ${route.id} said "got off" after reopening mid-ride`);
+      if (resumedAfter < 0) problems.push(`ride-follow resume: route ${route.id} never found the bus again`);
+      const want = route.stops.map((_, i) => i).filter((i) => i >= back);
+      if (logged[logged.length - 1] !== route.stops.length - 1 || logged[0] > back) {
+        problems.push(`ride-follow resume: route ${route.id} logged [${logged}] after reopening near stop ${back}, expected [${want}]`);
+      }
+    }
   });
   console.log(`ride follow: ${rides} simulated rides`);
 }

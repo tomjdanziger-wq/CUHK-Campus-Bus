@@ -214,8 +214,10 @@
       keepDays: 120,          // how long Firestore keeps reports (TTL) —
                               // long enough to measure ride times over a term
       cooldownSeconds: 45,    // one new report per phone per this long
-      rideTapSeconds: 10,     // ...but the next stop of the same ride only
-                              // needs this long (stops can be close)
+      rideTapSeconds: 3,      // ...but the next report of the same ride or
+                              // spotting session only needs this long
+      spotMaxAgeHours: 72,    // a report saved on the phone can still be
+                              // sent this long after the bus was seen
       rideIdleMinutes: 40,    // a ride with no tap for this long is over
       // Following a ride by GPS (only while the app is open):
       gpsMaxAccuracyMetres: 60, // ignore fixes vaguer than this

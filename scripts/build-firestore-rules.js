@@ -66,12 +66,12 @@ ${map}
         && request.resource.data.trip is string
         && request.resource.data.trip.size() >= 8 && request.resource.data.trip.size() <= 32
         && request.resource.data.t == request.time
-        // When the bus got there by the phone's clock: a report can wait a
-        // while for signal or the cooldown, but not come from the future.
+        // When the bus got there by the phone's clock: a report can wait on
+        // the phone for signal (up to ${T.spotMaxAgeHours} h), but not come from the future.
         && (!('at' in request.resource.data)
             || (request.resource.data.at is timestamp
                 && request.resource.data.at <= request.time + duration.value(2, 'm')
-                && request.resource.data.at >= request.time - duration.value(60, 'm')))
+                && request.resource.data.at >= request.time - duration.value(${T.spotMaxAgeHours}, 'h')))
         && (!('auto' in request.resource.data) || request.resource.data.auto is bool)
         && request.resource.data.expireAt is timestamp
         // Kept long enough to measure ride times across a term.
@@ -102,7 +102,7 @@ ${map}
         && (!('at' in request.resource.data)
             || (request.resource.data.at is timestamp
                 && request.resource.data.at <= request.time + duration.value(2, 'm')
-                && request.resource.data.at >= request.time - duration.value(60, 'm')))
+                && request.resource.data.at >= request.time - duration.value(${T.spotMaxAgeHours}, 'h')))
         && request.resource.data.expireAt is timestamp
         && request.resource.data.expireAt <= request.time + duration.value(${T.keepDays + 1}, 'd')
         && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.t == request.time
@@ -128,7 +128,7 @@ ${map}
         && request.resource.data.t == request.time
         && request.resource.data.at is timestamp
         && request.resource.data.at <= request.time + duration.value(2, 'm')
-        && request.resource.data.at >= request.time - duration.value(60, 'm')
+        && request.resource.data.at >= request.time - duration.value(${T.spotMaxAgeHours}, 'h')
         && request.resource.data.expireAt is timestamp
         && request.resource.data.expireAt <= request.time + duration.value(${T.keepDays + 1}, 'd')
         && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.t == request.time

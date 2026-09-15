@@ -5,7 +5,7 @@ rules_version = '2';
 // Rider reports for the CUHK Shuttle Helper. Anyone may read them. A phone
 // may add one when it is signed in (anonymously — no account), names a stop
 // that really is at that position on that route, and has not reported in the
-// last 45 seconds — or 10 seconds when it is the next stop
+// last 45 seconds — or 3 seconds when it is the next stop
 // of the same ride. Nothing can be changed or deleted afterwards.
 //
 // Every report carries a random ride id. A ride of one report is a plain
@@ -46,12 +46,12 @@ service cloud.firestore {
         && request.resource.data.trip is string
         && request.resource.data.trip.size() >= 8 && request.resource.data.trip.size() <= 32
         && request.resource.data.t == request.time
-        // When the bus got there by the phone's clock: a report can wait a
-        // while for signal or the cooldown, but not come from the future.
+        // When the bus got there by the phone's clock: a report can wait on
+        // the phone for signal (up to 72 h), but not come from the future.
         && (!('at' in request.resource.data)
             || (request.resource.data.at is timestamp
                 && request.resource.data.at <= request.time + duration.value(2, 'm')
-                && request.resource.data.at >= request.time - duration.value(60, 'm')))
+                && request.resource.data.at >= request.time - duration.value(72, 'h')))
         && (!('auto' in request.resource.data) || request.resource.data.auto is bool)
         && request.resource.data.expireAt is timestamp
         // Kept long enough to measure ride times across a term.
@@ -82,7 +82,7 @@ service cloud.firestore {
         && (!('at' in request.resource.data)
             || (request.resource.data.at is timestamp
                 && request.resource.data.at <= request.time + duration.value(2, 'm')
-                && request.resource.data.at >= request.time - duration.value(60, 'm')))
+                && request.resource.data.at >= request.time - duration.value(72, 'h')))
         && request.resource.data.expireAt is timestamp
         && request.resource.data.expireAt <= request.time + duration.value(121, 'd')
         && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.t == request.time
@@ -108,7 +108,7 @@ service cloud.firestore {
         && request.resource.data.t == request.time
         && request.resource.data.at is timestamp
         && request.resource.data.at <= request.time + duration.value(2, 'm')
-        && request.resource.data.at >= request.time - duration.value(60, 'm')
+        && request.resource.data.at >= request.time - duration.value(72, 'h')
         && request.resource.data.expireAt is timestamp
         && request.resource.data.expireAt <= request.time + duration.value(121, 'd')
         && getAfter(/databases/$(database)/documents/throttle/$(request.auth.uid)).data.t == request.time
@@ -131,7 +131,7 @@ service cloud.firestore {
         && request.resource.data.t == request.time
         && (request.time > resource.data.t + duration.value(45, 's')
             || (request.resource.data.trip == resource.data.trip
-                && request.time > resource.data.t + duration.value(10, 's')));
+                && request.time > resource.data.t + duration.value(3, 's')));
       allow delete: if false;
     }
   }

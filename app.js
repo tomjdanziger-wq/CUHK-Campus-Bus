@@ -1832,6 +1832,7 @@
       var since = window.firebase.firestore.Timestamp.fromMillis(Date.now() - TRACK.showMinutes * 60000);
       track.subscribedAt = Date.now();
       track.lists = { sightings: null, spots: null };
+      track.failed = {};
 
       var offs = ['sightings', 'spots'].map(function (name) {
         return db.collection(name)
@@ -1860,10 +1861,20 @@
             });
             mergeLists();
           }, function (err) {
+            // One collection refused (rules not yet published for it, say)
+            // must not take the other down with it. Carry on with an empty
+            // list for this one; only if both fail is tracking unavailable.
             if (window.console) console.warn(name + ' listener:', err);
-            track.status = 'error';
-            stopListening();
-            sightingsChanged();
+            track.failed = track.failed || {};
+            track.failed[name] = true;
+            track.lists[name] = [];
+            if (track.failed.sightings && track.failed.spots) {
+              track.status = 'error';
+              stopListening();
+              sightingsChanged();
+            } else {
+              mergeLists();
+            }
           });
       });
       track.unsubscribe = function () { offs.forEach(function (off) { off(); }); };
@@ -1879,6 +1890,7 @@
   }
 
   function mergeLists() {
+    if (track.lists.sightings === null && track.lists.spots === null) return;
     track.status = 'ok';
     track.list = (track.lists.sightings || []).concat(track.lists.spots || [])
       .filter(function (sg) { return Date.now() - sg.t <= TRACK.showMinutes * 60000; })
@@ -2722,7 +2734,7 @@
     watchId: null,
     fix: null,
     session: null,         // random id for this phone's spotting session
-    log: [],               // newest first: { key, route, stop, i, at, state }
+    log: [],               // newest first: { key, route, stop, i, at, sendAfter, session, state }
     queue: [],
     nextAllowed: 0,
     sending: false,
@@ -2730,7 +2742,6 @@
   };
 
   function openSpot() {
-    if (!spot.session) spot.session = newTripId();
     firebaseReady().catch(function () {});        // sign in early
     fetchSightings();
     startSpotWatch();
@@ -2858,64 +2869,189 @@
     var last = spot.log[0];
     if (last && last.route === route.id && last.stop === stop.id && now - last.at < 3000) return;
 
-    var entry = { key: now + ':' + route.id, route: route.id, stop: stop.id,
-                  i: route.stops.indexOf(stop.id), at: now, state: 'waiting' };
+    var entry = {
+      // A fixed document id, chosen now: if a send is retried after the app
+      // was closed mid-way, the same report cannot be stored twice.
+      key: newTripId() + newTripId().slice(0, 4),
+      route: route.id, stop: stop.id, i: route.stops.indexOf(stop.id),
+      at: now,                        // when the bus was there — never changed
+      sendAfter: now + SPOT_UNDO_MS,  // when it may go out
+      session: spot.session,
+      state: 'waiting'
+    };
     spot.log.unshift(entry);
     spot.queue.push(entry);
+    saveSpots();
     if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
     renderSpotLog();
     pumpSpots();
   }
 
   function undoSpot(entry) {
-    if (entry.state !== 'waiting') return;
+    if (entry.state !== 'waiting' || Date.now() >= entry.sendAfter) return;
     spot.queue = spot.queue.filter(function (e) { return e !== entry; });
     spot.log = spot.log.filter(function (e) { return e !== entry; });
+    saveSpots();
     renderSpotLog();
+  }
+
+  /**
+   * Waiting taps live on the phone until the database has them. No signal,
+   * the app closed, a cooldown refusal — they stay, with the time the bus
+   * was actually there, and go out the next time the app is open.
+   */
+  function saveSpots() {
+    try {
+      localStorage.setItem('spotQueue', JSON.stringify({
+        session: spot.session,
+        queue: spot.queue.map(function (e) {
+          return { key: e.key, route: e.route, stop: e.stop, i: e.i, at: e.at,
+                   sendAfter: e.sendAfter, session: e.session };
+        })
+      }));
+    } catch (e) { /* private mode: they just won't survive closing the app */ }
+  }
+
+  function loadSpots() {
+    try {
+      var saved = JSON.parse(localStorage.getItem('spotQueue') || 'null');
+      if (!saved) return;
+      // Keep the session, so the database sees the same spotter and the short
+      // cooldown applies instead of the long one.
+      spot.session = saved.session || spot.session;
+      (saved.queue || []).forEach(function (e) {
+        // Older than the rules accept: nothing can be done with it.
+        if (Date.now() - e.at > TRACK.spotMaxAgeHours * 3600000) return;
+        e.state = 'waiting';
+        e.restored = true;
+        spot.queue.push(e);
+        spot.log.push(e);
+      });
+      spot.log.sort(function (a, b) { return b.at - a.at; });
+    } catch (e) { /* ignore */ }
   }
 
   function pumpSpots() {
     clearTimeout(spot.timer);
-    if (spot.sending || !spot.queue.length) return;
-    var e = spot.queue[0];
-    var wait = Math.max(e.at + SPOT_UNDO_MS, spot.nextAllowed) - Date.now();
-    if (wait > 0) {
-      spot.timer = setTimeout(pumpSpots, wait + 50);
+    if (spot.sending || !spot.queue.length || !navigator.onLine) return;
+
+    // Everything whose undo window has passed goes in ONE write — up to ten,
+    // all from the same session (the cooldown is per session). Three buses
+    // arriving together no longer wait for each other.
+    var session = spot.queue[0].session;
+    var now = Date.now();
+    var due = spot.queue.filter(function (e) {
+      return e.session === session && e.sendAfter <= now;
+    }).slice(0, 10);
+    var wait = Math.max(spot.queue[0].sendAfter, spot.nextAllowed) - now;
+    if (!due.length || wait > 0) {
+      spot.timer = setTimeout(pumpSpots, Math.max(wait, 250) + 50);
       renderSpotLog();
       return;
     }
 
     spot.sending = true;
-    e.state = 'sending';
+    due.forEach(function (e) { e.state = 'sending'; });
     renderSpotLog();
-    postRideEvent('spots', e.route, e.i, e.stop, spot.session, { at: e.at })
-      .then(sent, function (err) {
-        if (err && err.code === 'slow') return sent();       // queued by Firestore
-        spot.sending = false;
-        if (err && err.code === 'off') {
-          e.state = 'failed';
-          spot.queue.shift();
-          $('spot-status').textContent = describeFailure(err);
-        } else {
-          // The cooldown (a ride report just before), or no signal: retry.
-          e.state = 'waiting';
-          e.attempts = (e.attempts || 0) + 1;
-          spot.nextAllowed = Date.now() + (err && err.code === 'permission-denied' ? 11000 : 15000);
-          if (e.attempts > 8) { e.state = 'failed'; spot.queue.shift(); }
-        }
-        renderSpotLog();
-        pumpSpots();
-      });
 
-    function sent() {
+    sendSpotBatch(due, session).then(function () {
+      done(due);
+    }, function (err) {
+      var code = err && err.code;
+      if (code === 'slow') {
+        // Handed to Firestore but not confirmed. Leave them saved on the
+        // phone: if the app closes before it gets through, they are sent
+        // again next time (their fixed ids stop them doubling up).
+        due.forEach(function (e) { e.state = 'queued'; });
+        err.pending.then(function () { done(due); }, function () { retry(due, 15000); });
+        spot.sending = false;
+        renderSpotLog();
+        return;
+      }
+      if (code === 'off') {
+        spot.sending = false;
+        $('spot-status').textContent = describeFailure(err);
+        due.forEach(function (e) { e.state = 'waiting'; });
+        renderSpotLog();
+        return;
+      }
+      if (code === 'permission-denied') {
+        // Either the cooldown, or some of these were already stored by an
+        // earlier attempt (a create on an existing id is refused). Find out
+        // which, drop those, and try the rest again.
+        return alreadyStored(due).then(function (stored) {
+          if (stored.length) done(stored, true);
+          retry(due.filter(function (e) { return stored.indexOf(e) === -1; }),
+                TRACK.rideTapSeconds * 1000 + 500);
+        }, function () { retry(due, 15000); });
+      }
+      retry(due, 15000);
+    });
+
+    function done(entries, silently) {
+      spot.failures = 0;
+      entries.forEach(function (e) { e.state = 'sent'; });
+      spot.queue = spot.queue.filter(function (e) { return entries.indexOf(e) === -1; });
       spot.sending = false;
-      e.state = 'sent';
-      spot.queue.shift();
-      spot.nextAllowed = Date.now() + TRACK.rideTapSeconds * 1000 + 500;
-      $('spot-status').textContent = '';
+      spot.nextAllowed = Date.now() + TRACK.rideTapSeconds * 1000 + 300;
+      if (!silently) $('spot-status').textContent = '';
+      saveSpots();
       renderSpotLog();
       pumpSpots();
     }
+
+    function retry(entries, delay) {
+      // Back off when it keeps failing, so a refusal that is not the cooldown
+      // (rules not published yet, say) does not become a loop of requests.
+      spot.failures = (spot.failures || 0) + 1;
+      if (spot.failures >= 3) delay = Math.max(delay, Math.min(120000, 5000 * Math.pow(2, spot.failures - 3)));
+      if (spot.failures >= 4) {
+        $('spot-status').textContent = 'The database is not accepting these right now. They are saved on your phone and will keep trying.';
+      }
+      entries.forEach(function (e) { e.state = 'waiting'; });
+      spot.sending = false;
+      spot.nextAllowed = Date.now() + delay;
+      saveSpots();
+      renderSpotLog();
+      pumpSpots();
+    }
+  }
+
+  function sendSpotBatch(entries, session) {
+    return firebaseReady().then(function (db) {
+      var fb = window.firebase;
+      var uid = fb.auth().currentUser.uid;
+      var now = fb.firestore.FieldValue.serverTimestamp();
+      var batch = db.batch();
+      entries.forEach(function (e) {
+        batch.set(db.collection('spots').doc(e.key), {
+          stop: e.stop, route: e.route, i: e.i, trip: session, t: now,
+          at: fb.firestore.Timestamp.fromMillis(e.at),
+          expireAt: fb.firestore.Timestamp.fromMillis(Date.now() + TRACK.keepDays * 86400000)
+        });
+      });
+      batch.set(db.collection('throttle').doc(uid), { t: now, trip: session });
+
+      var commit = batch.commit();
+      return Promise.race([
+        commit,
+        new Promise(function (resolve, reject) {
+          setTimeout(function () { reject({ code: 'slow', pending: commit }); }, 12000);
+        })
+      ]);
+    }, function (err) {
+      throw { code: err && err.message === 'off' ? 'off' : 'unavailable' };
+    });
+  }
+
+  /** Which of these reports are already in the database? */
+  function alreadyStored(entries) {
+    return firebaseReady().then(function (db) {
+      return Promise.all(entries.map(function (e) {
+        return db.collection('spots').doc(e.key).get({ source: 'server' })
+          .then(function (d) { return d.exists ? e : null; });
+      }));
+    }).then(function (found) { return found.filter(Boolean); });
   }
 
   function renderSpotLog() {
@@ -2930,12 +3066,14 @@
       li.appendChild(routeBadge(route));
       var text = el('span', 'sightings__text');
       text.appendChild(el('span', 'sightings__stop', stop.name));
-      var left = Math.ceil((e.at + SPOT_UNDO_MS - now) / 1000);
+      var left = Math.ceil((e.sendAfter - now) / 1000);
       text.appendChild(el('span', 'sightings__sub', clock(e.at).slice(0, 5) + ' · ' + (
         e.state === 'sent' ? 'sent' :
         e.state === 'sending' ? 'sending…' :
-        e.state === 'failed' ? 'not sent' :
-        left > 0 ? 'sends in ' + left + ' s' : 'waiting to send')));
+        e.state === 'queued' ? 'saved on phone, sending when there is signal' :
+        !navigator.onLine ? 'saved on phone, sends when you are back online' :
+        left > 0 ? 'sends in ' + left + ' s' :
+        e.restored ? 'saved from last time, sending…' : 'waiting to send')));
       li.appendChild(text);
       if (e.state === 'waiting' && left > 0) {
         var undo = el('button', 'report__more spot__undo', 'Undo');
@@ -2949,7 +3087,7 @@
       'Nothing yet. Every bus you tap helps work out how punctual the routes are.';
 
     // Keep the countdown moving while anything is still undoable.
-    if (spot.log.some(function (e) { return e.state === 'waiting' && e.at + SPOT_UNDO_MS > now; })) {
+    if (spot.log.some(function (e) { return e.state === 'waiting' && e.sendAfter > now; })) {
       clearTimeout(spot.tick);
       spot.tick = setTimeout(renderSpotLog, 1000);
     }
@@ -2960,15 +3098,25 @@
       spot.showAll = !spot.showAll;
       renderSpot();
     });
-    // Anything still waiting goes out if the app is closed — better a wrong
-    // tap than a lost bus. (Firestore sends what it can.)
+
+    // Taps saved on the phone last time go out as soon as the app is open.
+    loadSpots();
+    if (!spot.session) spot.session = newTripId();
+    if (spot.queue.length) pumpSpots();
+
+    window.addEventListener('online', pumpSpots);
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) {
         closeSpot();
-        spot.queue.forEach(function (e) { e.at = Math.min(e.at, Date.now() - SPOT_UNDO_MS); });
+        // Leaving the app ends the undo window: send what can be sent now.
+        // Only when to send changes — never when the bus was there.
+        var now = Date.now();
+        spot.queue.forEach(function (e) { e.sendAfter = Math.min(e.sendAfter, now); });
+        saveSpots();
         pumpSpots();
-      } else if (currentPage === PAGE_SPOT) {
-        startSpotWatch();
+      } else {
+        if (currentPage === PAGE_SPOT) startSpotWatch();
+        pumpSpots();
       }
     });
   }

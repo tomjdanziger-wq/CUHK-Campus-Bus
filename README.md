@@ -656,14 +656,25 @@ It pairs consecutive taps one stop apart within each ride, takes the median per 
 
 The project config is in `data/firebase-config.js` (it is a public identifier, not a secret — the rules protect the data). To use a different project, replace it; to switch tracking off, set it to `null`.
 
-In the [Firebase console](https://console.firebase.google.com/):
+One-time, in the [Firebase console](https://console.firebase.google.com/): **Authentication → Sign-in method → Anonymous** → enable.
 
-1. **Authentication → Sign-in method → Anonymous** → enable.
-2. **Firestore Database → Create database** → a region near Hong Kong (`asia-east2`) → production mode.
-3. **Firestore Database → Rules** → replace everything with the contents of `firestore.rules` → **Publish**.
-4. **Firestore Database → TTL policies** (under the database settings) → create a policy on collection `sightings`, field `expireAt`. Firestore then deletes reports after `keepDays` on its own.
+Everything else is deployed from this folder with the official Firebase CLI — the database (in `asia-east2`, Hong Kong), the security rules, and the TTL policies that delete old reports (`firestore.indexes.json`):
 
-When routes or stops change, run `node scripts/build-firestore-rules.js` and publish the rules again, or reports from new stops will be refused.
+```bash
+npx firebase-tools login
+```
+
+```bash
+npx firebase-tools firestore:databases:create "(default)" --location=asia-east2 --project cuhk-buses
+```
+
+```bash
+npx firebase-tools deploy --only firestore --project cuhk-buses
+```
+
+The first two are needed once. After that, only the deploy.
+
+When routes or stops change, run `node scripts/build-firestore-rules.js` and deploy again, or reports from new stops will be refused.
 
 ## Deliberately not built (v1)
 
